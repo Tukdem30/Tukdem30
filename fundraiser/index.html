@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Help Us Get Home to Hawaii</title>
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --card: #ffffff;
+    --text: #222;
+    --muted: #666;
+    --accent: #1f7a6d;
+    --accent-dark: #155a50;
+    --bar: #e3e0d8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161816;
+      --card: #20231f;
+      --text: #ececec;
+      --muted: #a9a9a9;
+      --accent: #4fb8a6;
+      --accent-dark: #3c9a8a;
+      --bar: #3a3e38;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161816;
+    --card: #20231f;
+    --text: #ececec;
+    --muted: #a9a9a9;
+    --accent: #4fb8a6;
+    --accent-dark: #3c9a8a;
+    --bar: #3a3e38;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 32px 16px 48px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 8px; }
+  h2 { font-size: 1.2rem; margin: 0 0 10px; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); font-size: 0.95rem; }
+  .progress {
+    background: var(--bar);
+    border-radius: 999px;
+    height: 14px;
+    overflow: hidden;
+    margin: 16px 0 8px;
+  }
+  .progress > span {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 999px;
+  }
+  .amounts { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-weight: 600; }
+  ul { padding-left: 20px; margin: 0; }
+  li { margin-bottom: 8px; }
+  .btn {
+    display: block;
+    text-align: center;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+  }
+  .btn:hover { background: var(--accent-dark); }
+  .breakdown td { padding: 6px 0; vertical-align: top; }
+  .breakdown td:last-child { text-align: right; white-space: nowrap; font-weight: 600; }
+  .breakdown tr.total td { border-top: 1px solid var(--bar); padding-top: 10px; font-weight: 700; }
+  .placeholder { background: rgba(255, 210, 0, 0.25); padding: 0 3px; border-radius: 3px; }
+  @media (max-width: 480px) {
+    h1 { font-size: 1.4rem; }
+    .card { padding: 18px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <section class="card">
+    <h1>Help <span class="placeholder">[Girlfriend's name]</span> Get Home to Hawaii</h1>
+    <p class="muted">Fundraiser for travel and expenses following the passing of <span class="placeholder">[Mom's name]</span></p>
+
+    <p>
+      On <span class="placeholder">[date]</span>, <span class="placeholder">[Mom's name]</span> passed away.
+      <span class="placeholder">[Girlfriend's name]</span> has lived in California for 24 years and has been back to Hawaii
+      only once in all that time. Hawaii is where <span class="placeholder">[Mom's name]</span> is laid to rest,
+      where family is gathering, and where <span class="placeholder">[Girlfriend's name]</span> needs to be right now.
+    </p>
+    <p>
+      We have nine days to get there. Flights, a place to stay, and the costs that come with a funeral and
+      family arrangements add up quickly, and this is more than we can cover on short notice alone.
+    </p>
+
+    <div class="progress" aria-label="Fundraising progress">
+      <span id="bar"></span>
+    </div>
+    <div class="amounts">
+      <span>Raised: $<span id="raised">0</span></span>
+      <span>Goal: $<span id="goal">0</span></span>
+    </div>
+
+    <a class="btn" href="https://www.gofundme.com/" target="_blank" rel="noopener">Donate</a>
+  </section>
+
+  <section class="card">
+    <h2>Where the money goes</h2>
+    <table class="breakdown" style="width:100%; border-collapse:collapse;">
+      <tr><td>Flights (CA to HI, round trip, for <span class="placeholder">[number]</span> people)</td><td>$<span class="placeholder">[amount]</span></td></tr>
+      <tr><td>Lodging for the trip</td><td>$<span class="placeholder">[amount]</span></td></tr>
+      <tr><td>Ground transportation and meals</td><td>$<span class="placeholder">[amount]</span></td></tr>
+      <tr><td>Funeral and memorial costs, if not covered</td><td>$<span class="placeholder">[amount]</span></td></tr>
+      <tr class="total"><td>Total goal</td><td>$<span class="placeholder">[amount]</span></td></tr>
+    </table>
+    <p class="muted" style="margin-top:12px;">Any money raised beyond what we need will go toward the costs of getting <span class="placeholder">[Mom's name]</span> laid to rest.</p>
+  </section>
+
+  <section class="card">
+    <h2>How you can help</h2>
+    <ul>
+      <li>Donate, even a small amount. Every dollar counts.</li>
+      <li>Share this page with family, friends, and coworkers.</li>
+      <li>If you knew <span class="placeholder">[Mom's name]</span>, leave a memory in the comments on the fundraiser page. <span class="placeholder">[Girlfriend's name]</span> would love to read them.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>A thank you</h2>
+    <p>Thank you for keeping our family in your thoughts. We will post updates here as we go.</p>
+    <p class="muted">Posted by <span class="placeholder">[your name]</span></p>
+  </section>
+
+</main>
+
+<script>
+  // Set these two numbers to the live totals before sharing.
+  // Update them by hand, or replace this block with the numbers from the fundraising platform.
+  const RAISED = 0;
+  const GOAL = 0;
+
+  const pct = GOAL > 0 ? Math.min(100, (RAISED / GOAL) * 100) : 0;
+  document.getElementById('raised').textContent = RAISED.toLocaleString();
+  document.getElementById('goal').textContent = GOAL.toLocaleString();
+  document.getElementById('bar').style.width = pct + '%';
+</script>
+</body>
+</html>
