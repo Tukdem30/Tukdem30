@@ -72,3 +72,10 @@ fieldset { border: 1px solid #3a3149; border-radius: 6px; display: grid; gap: 0.
 #notice.error { color: var(--danger); }
 #notice.ok { color: #c77dff; }
 .warn { color: var(--warn); }
+
+.founders { margin-bottom: 1rem; }
+.founders h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+.founder-list { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.founder { display: grid; gap: 0.1rem; background: var(--card); border: 1px solid #8e3fc4; border-radius: 8px; padding: 0.6rem 0.9rem; }
+.founder strong { font-size: 1rem; }
+.founder span { color: #e9b8ff; font-size: 0.85rem; }

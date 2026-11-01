@@ -83,7 +83,23 @@ function setLoggedIn(on) {
 
 // ---------- auth ----------
 
+async function loadFounders() {
+  try {
+    const data = await api("/api/founders");
+    if (!data.founders.length) return;
+    const box = $("#founders-list");
+    box.replaceChildren();
+    for (const f of data.founders) {
+      box.append(el("div", { class: "founder" }, el("strong", {}, f.display_name), el("span", {}, f.founder_title)));
+    }
+    $("#founders").hidden = false;
+  } catch {
+    // The front page still works without the founders list.
+  }
+}
+
 async function boot() {
+  loadFounders();
   try {
     state.me = await api("/api/me");
     setLoggedIn(true);

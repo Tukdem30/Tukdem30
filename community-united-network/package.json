@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "migrate": "tsx src/migrate-cli.ts",
-    "make-admin": "tsx src/admin-cli.ts"
+    "make-admin": "tsx src/admin-cli.ts",
+    "set-founder": "tsx src/founder-cli.ts"
   },
   "author": "",
   "license": "ISC",

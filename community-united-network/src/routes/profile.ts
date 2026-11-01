@@ -21,7 +21,7 @@ const profileSchema = z.object({
 });
 
 const PROFILE_COLUMNS = `id, display_name, role_mode, city, state, zip, bio, availability,
-  skills, tools, verification_status, is_admin, created_at`;
+  skills, tools, verification_status, is_admin, founder_title, created_at`;
 
 profileRouter.get("/", requireUser, async (req, res) => {
   const { rows } = await pool.query(`SELECT ${PROFILE_COLUMNS} FROM users WHERE id = $1`, [req.user!.id]);
@@ -104,4 +104,14 @@ profileRouter.post("/request-verification", requireUser, async (req, res) => {
   );
   if (!rowCount) throw new HttpError(409, "Verification is already requested or complete");
   res.json({ verification_status: "pending" });
+});
+
+/** Public list of founders for the front page. */
+export const foundersRouter = Router();
+
+foundersRouter.get("/", async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT display_name, founder_title FROM users WHERE founder_title IS NOT NULL ORDER BY display_name`,
+  );
+  res.json({ founders: rows });
 });

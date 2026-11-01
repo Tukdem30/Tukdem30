@@ -418,3 +418,15 @@ describe("admin queue and verification requests", () => {
     expect(queue.body.safety_reports).toHaveLength(1);
   });
 });
+
+describe("founders", () => {
+  it("lists founders publicly and shows the title on the profile", async () => {
+    const u = await newUser("both", "founder");
+    await pool.query("UPDATE users SET founder_title = 'Co-founder' WHERE id = $1", [u.id]);
+    const list = await request(app).get("/api/founders");
+    expect(list.status).toBe(200);
+    expect(list.body.founders.map((f: { founder_title: string }) => f.founder_title)).toContain("Co-founder");
+    const me = await u.agent.get("/api/me");
+    expect(me.body.founder_title).toBe("Co-founder");
+  });
+});

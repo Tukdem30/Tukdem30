@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS founder_title text;
+
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash  text PRIMARY KEY,
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
