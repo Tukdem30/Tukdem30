@@ -14,7 +14,8 @@
 
 body { margin: 0; line-height: 1.5; }
 header { background: var(--accent); color: var(--accent-ink); padding: 1rem 1.25rem; }
-header h1 { margin: 0; font-size: 1.5rem; }
+header h1 { margin: 0; font-size: 1.5rem; display: inline-block; vertical-align: middle; }
+header .logo { width: 64px; height: 64px; border-radius: 14px; vertical-align: middle; margin-right: 0.6rem; }
 .tagline { margin: 0.25rem 0 0.75rem; opacity: 0.9; }
 nav { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 main { max-width: 56rem; margin: 0 auto; padding: 1.25rem; }
