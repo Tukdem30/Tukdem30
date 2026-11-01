@@ -624,6 +624,42 @@ async function loadAdmin() {
     );
   }
 
+  const verifiedBox = $("#admin-verified");
+  verifiedBox.replaceChildren();
+  if (!data.verified_members.length) verifiedBox.append(el("p", { class: "hint" }, "No verified members yet."));
+  for (const u of data.verified_members) {
+    verifiedBox.append(
+      adminRow(
+        [
+          el("strong", {}, u.display_name),
+          el("div", { class: "meta" }, `${u.email} · ${u.role_mode.replaceAll("_", " ")} · ${u.city || ""} ${u.zip || ""}`),
+        ],
+        [actionButton("Revoke", async () => {
+          const res = await run(() => api(`/api/admin/users/${u.id}/verification`, { body: { status: "unverified" } }), "Verification removed.");
+          if (res) loadAdmin();
+        }, "danger")],
+      ),
+    );
+  }
+
+  const unverifiedBox = $("#admin-unverified");
+  unverifiedBox.replaceChildren();
+  if (!data.unverified_members.length) unverifiedBox.append(el("p", { class: "hint" }, "Everyone is verified or pending review."));
+  for (const u of data.unverified_members) {
+    unverifiedBox.append(
+      adminRow(
+        [
+          el("strong", {}, u.display_name),
+          el("div", { class: "meta" }, `${u.email} · ${u.verification_status} · ${u.role_mode.replaceAll("_", " ")} · ${u.city || ""} ${u.zip || ""}`),
+        ],
+        [actionButton("Verify", async () => {
+          const res = await run(() => api(`/api/admin/users/${u.id}/verification`, { body: { status: "verified" } }), "Verified.");
+          if (res) loadAdmin();
+        })],
+      ),
+    );
+  }
+
   const verify = $("#admin-verify");
   verify.replaceChildren();
   if (!data.verification_requests.length) verify.append(el("p", { class: "hint" }, "No verification requests."));

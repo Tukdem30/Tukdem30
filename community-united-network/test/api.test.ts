@@ -432,6 +432,9 @@ describe("admin queue and verification requests", () => {
 
     const queue = await admin.agent.get("/api/admin/queue");
     expect(queue.body.verification_requests.map((u: { id: string }) => u.id)).toContain(helper.id);
+    // A pending request shows under Verification requests, not under Not yet verified.
+    expect(queue.body.unverified_members.map((u: { id: string }) => u.id)).not.toContain(helper.id);
+    expect(queue.body.verified_members.map((u: { id: string }) => u.id)).not.toContain(helper.id);
     expect((await helper.agent.get("/api/admin/queue")).status).toBe(403);
   });
 

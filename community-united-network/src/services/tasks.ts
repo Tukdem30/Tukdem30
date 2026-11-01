@@ -995,7 +995,25 @@ export async function adminQueue(admin: AuthUser) {
         WHERE s.status = 'open' ORDER BY s.created_at LIMIT 100`,
     ),
   ]);
-  return { tasks: tasksRes.rows, verification_requests: usersRes.rows, safety_reports: reportsRes.rows };
+  const [verifiedRes, unverifiedRes] = await Promise.all([
+    pool.query(
+      `SELECT id, display_name, email, role_mode, city, zip, created_at
+         FROM users WHERE verification_status = 'verified'
+        ORDER BY created_at DESC LIMIT 200`,
+    ),
+    pool.query(
+      `SELECT id, display_name, email, role_mode, city, zip, verification_status, created_at
+         FROM users WHERE verification_status IN ('unverified', 'rejected')
+        ORDER BY created_at DESC LIMIT 200`,
+    ),
+  ]);
+  return {
+    tasks: tasksRes.rows,
+    verification_requests: usersRes.rows,
+    safety_reports: reportsRes.rows,
+    verified_members: verifiedRes.rows,
+    unverified_members: unverifiedRes.rows,
+  };
 }
 
 // ---------- payment (Stripe Checkout, test mode first) ----------
