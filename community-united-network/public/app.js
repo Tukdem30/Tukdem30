@@ -606,3 +606,10 @@ async function loadAdmin() {
 }
 
 boot();
+
+// Service worker: lets the app install to the home screen and open offline.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {
+    // Installing is optional; the app still works in the browser without it.
+  });
+}
