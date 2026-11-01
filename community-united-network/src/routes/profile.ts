@@ -20,10 +20,11 @@ const profileSchema = z.object({
   availability: z.string().max(300).optional(),
   skills: tagList.optional(),
   tools: tagList.optional(),
+  profile_public: z.boolean().optional(),
 });
 
 const PROFILE_COLUMNS = `id, display_name, role_mode, city, state, zip, bio, availability,
-  skills, tools, verification_status, is_admin, founder_title, created_at`;
+  skills, tools, verification_status, is_admin, founder_title, profile_public, created_at`;
 
 profileRouter.get("/", requireUser, async (req, res) => {
   const { rows } = await pool.query(`SELECT ${PROFILE_COLUMNS} FROM users WHERE id = $1`, [req.user!.id]);
@@ -143,3 +144,45 @@ profileRouter.post("/payout-account", requireUser, async (req, res) => {
   await pool.query("UPDATE users SET stripe_account_id = $2 WHERE id = $1", [req.user!.id, accountId]);
   res.json({ url });
 });
+
+/** Public community directory: only members who chose to be listed. Never includes email, birth date, ZIP, or address. */
+export const membersRouter = Router();
+
+const MEMBER_COLUMNS = `id, display_name, role_mode, city, state, bio, skills, tools,
+  verification_status, founder_title`;
+
+membersRouter.get("/", async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT ${MEMBER_COLUMNS} FROM users
+      WHERE profile_public = true AND verification_status <> 'rejected'
+      ORDER BY founder_title IS NULL, display_name LIMIT 300`,
+  );
+  res.json({ members: rows.map(toPublicMember) });
+});
+
+membersRouter.get("/:id", async (req, res) => {
+  const id = String(req.params.id);
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(404, "Member not found");
+  const { rows } = await pool.query(
+    `SELECT ${MEMBER_COLUMNS} FROM users
+      WHERE id = $1 AND profile_public = true AND verification_status <> 'rejected'`,
+    [id],
+  );
+  if (!rows[0]) throw new HttpError(404, "Member not found");
+  res.json({ member: toPublicMember(rows[0]) });
+});
+
+function toPublicMember(r: Record<string, unknown>) {
+  return {
+    id: r.id,
+    display_name: r.display_name,
+    role_mode: r.role_mode,
+    city: r.city,
+    state: r.state,
+    bio: r.bio,
+    skills: r.skills,
+    tools: r.tools,
+    verified: r.verification_status === "verified",
+    founder_title: r.founder_title,
+  };
+}

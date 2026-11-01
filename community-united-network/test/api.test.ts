@@ -563,3 +563,26 @@ describe("payments", () => {
     expect(vi.mocked(payments.refundToRequester)).not.toHaveBeenCalled();
   });
 });
+
+describe("community directory", () => {
+  it("lists only members who opted in, and never shows private details", async () => {
+    const shown = await newUser("both", "dir-shown");
+    const hidden = await newUser("both", "dir-hidden");
+    await shown.agent.put("/api/me").send({ display_name: "Shown Member", city: "Colorado Springs", zip: "80903", profile_public: true, skills: ["Repair"] });
+    await hidden.agent.put("/api/me").send({ display_name: "Hidden Member", zip: "80903" });
+
+    const list = await request(app).get("/api/members");
+    expect(list.status).toBe(200);
+    const ids = list.body.members.map((m: { id: string }) => m.id);
+    expect(ids).toContain(shown.id);
+    expect(ids).not.toContain(hidden.id);
+
+    const member = list.body.members.find((m: { id: string }) => m.id === shown.id);
+    expect(member).not.toHaveProperty("email");
+    expect(member).not.toHaveProperty("zip");
+    expect(member).not.toHaveProperty("date_of_birth");
+
+    expect((await request(app).get(`/api/members/${hidden.id}`)).status).toBe(404);
+    expect((await request(app).get(`/api/members/${shown.id}`)).status).toBe(200);
+  });
+});

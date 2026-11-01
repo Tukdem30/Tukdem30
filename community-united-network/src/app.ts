@@ -7,7 +7,7 @@ import { loadUser } from "./auth.js";
 import { config } from "./config.js";
 import { errorHandler, HttpError } from "./errors.js";
 import { authRouter } from "./routes/auth.js";
-import { profileRouter, foundersRouter } from "./routes/profile.js";
+import { profileRouter, foundersRouter, membersRouter } from "./routes/profile.js";
 import { taskRouter } from "./routes/tasks.js";
 import { adminRouter } from "./routes/admin.js";
 
@@ -64,6 +64,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/me", profileRouter);
   app.use("/api/founders", foundersRouter);
+  app.use("/api/members", membersRouter);
   app.use("/api/tasks", taskRouter);
   app.use("/api/admin", adminRouter);
 

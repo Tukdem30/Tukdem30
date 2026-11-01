@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_account_id text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_public boolean NOT NULL DEFAULT false;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS funded boolean NOT NULL DEFAULT false;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS stripe_payment_intent_id text;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS stripe_charge_id text;

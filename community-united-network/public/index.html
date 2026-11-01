@@ -24,6 +24,7 @@
       <button data-view="mine">My tasks</button>
       <button data-view="post">Post a task</button>
       <button data-view="profile">My profile</button>
+      <button data-view="members">Community</button>
       <button data-view="admin" id="admin-nav" hidden>Admin</button>
       <button id="logout">Log out</button>
     </nav>
@@ -161,6 +162,7 @@
         <label>Tools and equipment you own (comma separated) <input name="tools" maxlength="2000" /></label>
         <label>Availability <input name="availability" maxlength="300" /></label>
         <label>About you <textarea name="bio" rows="3" maxlength="1000"></textarea></label>
+        <label><input type="checkbox" name="profile_public" /> Show my profile in the community directory</label>
         <button type="submit">Save profile</button>
       </form>
       <p id="verify-status" class="hint"></p>
@@ -170,6 +172,13 @@
         <p id="payout-status" class="hint"></p>
         <button id="payout-setup" type="button">Set up payouts</button>
       </div>
+    </section>
+
+    <section id="members" class="view" hidden>
+      <h2>Community members</h2>
+      <p class="hint">People who chose to share their profile. Contact details are never shown here.</p>
+      <div id="members-list" class="cards"></div>
+      <div id="member-detail" class="card" hidden></div>
     </section>
 
     <section id="admin" class="view" hidden>

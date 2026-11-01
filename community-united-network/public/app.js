@@ -71,6 +71,7 @@ function showView(name) {
   if (name === "mine") loadMine();
   if (name === "profile") loadProfile();
   if (name === "admin") loadAdmin();
+  if (name === "members") loadMembers();
   if (name === "post") $("#post-form").scrollIntoView({ block: "start" });
 }
 
@@ -507,10 +508,12 @@ async function loadProfile() {
   for (const [k, v] of Object.entries(p)) {
     const field = form.elements.namedItem(k);
     if (!field) continue;
+    if (field.type === "checkbox") continue; // checked state is set separately below
     if (field.type === "radio") form.querySelectorAll(`[name="role_mode"]`).forEach((r) => (r.checked = r.value === v));
     else if (Array.isArray(v)) field.value = v.join(", ");
     else field.value = v ?? "";
   }
+  $("#profile-form").elements.namedItem("profile_public").checked = Boolean(p.profile_public);
   $("#request-verify").hidden = !["unverified", "rejected"].includes(p.verification_status);
   loadPayouts();
   $("#verify-status").textContent =
@@ -532,6 +535,7 @@ $("#profile-form").addEventListener("submit", async (e) => {
     tools: splitList(f.get("tools")),
     availability: f.get("availability"),
     bio: f.get("bio"),
+    profile_public: f.get("profile_public") === "on",
   };
   const res = await run(() => api("/api/me", { method: "PUT", body }), "Profile saved.");
   if (res) loadProfile();
@@ -727,6 +731,47 @@ $("#payout-setup").addEventListener("click", async () => {
   const res = await run(() => api("/api/me/payout-account", { body: {} }));
   if (res && res.url) window.location.href = res.url;
 });
+
+// ---------- community directory ----------
+
+async function loadMembers() {
+  const data = await run(() => api("/api/members"));
+  const list = $("#members-list");
+  list.replaceChildren();
+  $("#member-detail").hidden = true;
+  if (!data) return;
+  if (data.members.length === 0) list.append(el("p", { class: "hint" }, "No members have shared their profile yet."));
+  for (const m of data.members) {
+    list.append(
+      el(
+        "article",
+        { class: "card" },
+        el("h3", {}, m.display_name, m.verified ? el("span", { class: "pill" }, "Verified") : null, m.founder_title ? el("span", { class: "pill" }, m.founder_title) : null),
+        el("div", { class: "meta" }, `${m.role_mode.replaceAll("_", " ")}${m.city ? ` · ${m.city}` : ""}${m.state ? `, ${m.state}` : ""}`),
+        el("div", {}, ...(m.skills || []).slice(0, 6).map((k) => el("span", { class: "pill" }, k))),
+        el("div", { class: "actions" }, actionButton("View profile", () => showMember(m.id), "secondary")),
+      ),
+    );
+  }
+}
+
+async function showMember(id) {
+  const data = await run(() => api(`/api/members/${id}`));
+  if (!data) return;
+  const m = data.member;
+  const panel = $("#member-detail");
+  panel.hidden = false;
+  panel.replaceChildren(
+    el("button", { type: "button", class: "secondary", onclick: () => { panel.hidden = true; loadMembers(); } }, "← Back to directory"),
+    el("h3", {}, m.display_name, m.verified ? el("span", { class: "pill" }, "Verified") : null),
+    el("div", { class: "meta" }, `${m.role_mode.replaceAll("_", " ")}${m.city ? ` · ${m.city}` : ""}${m.state ? `, ${m.state}` : ""}`),
+    m.bio ? el("p", {}, m.bio) : null,
+    m.skills?.length ? el("div", {}, el("strong", {}, "Skills: "), m.skills.join(", ")) : null,
+    m.tools?.length ? el("div", {}, el("strong", {}, "Tools: "), m.tools.join(", ")) : null,
+  );
+  $$(".view").forEach((v) => (v.hidden = v.id !== "members"));
+  panel.scrollIntoView({ block: "start" });
+}
 
 boot();
 
