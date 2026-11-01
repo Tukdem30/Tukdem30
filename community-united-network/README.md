@@ -29,10 +29,21 @@ first working version (MVP) of the concept.
 - **Privacy:** exact addresses are shown only to the requester and assigned helpers. Public listings show
   city and ZIP only.
 
+## Payments (Stripe, test mode)
+
+- Requesters pay through Stripe Checkout. The task stays unpublished until payment is confirmed.
+- Helpers set up a Stripe Express payout account from their profile. Paid tasks need a ready account.
+- When a task is confirmed, each helper's share is transferred to their Stripe account. The 10% fee stays with the platform.
+- Unused funds are refunded to the requester's card.
+- Set `STRIPE_SECRET_KEY` (a test key starting `sk_test_`) in the environment. Without it, payment features show "not set up yet."
+
+Known limits before going live:
+- There is no Stripe webhook yet. If a requester pays and never returns to the site, the payment is not recorded. A webhook must be added before real money is used.
+- Live mode needs legal review (money held and paid out between people) and published refund and dispute terms.
+
 ## Not yet built (deliberate MVP limits)
 
-- Real payment processing. Wire `payment_events` to a processor such as Stripe Connect with manual capture
-  before taking real money. This needs legal review first.
+- Live payments. Test mode is built; live mode needs a webhook and legal review first.
 - Identity verification provider. Admins currently set verification manually.
 - Minors. The platform is 18+ only for now.
 - Before-and-after photos, community-funded help, team pay rates, and hourly billing.

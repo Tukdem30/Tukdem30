@@ -105,6 +105,7 @@ async function boot() {
     setLoggedIn(true);
     $("#admin-nav").hidden = !state.me.is_admin;
     showView("browse");
+    await handleReturns();
   } catch {
     state.me = null;
     setLoggedIn(false);
@@ -254,6 +255,9 @@ async function openDetail(id) {
     task.supplies_note ? el("div", { class: "meta" }, `Supplies: ${task.supplies_note}`) : null,
     task.address_private ? el("div", { class: "meta" }, `Address (shared with people on this task): ${task.address_private}`) : null,
     task.held_cents !== undefined ? el("div", { class: "meta" }, `Held in escrow: ${money(task.held_cents)}`) : null,
+    task.help_type === "paid" && !task.funded
+      ? el("div", { class: "warn" }, isRequester ? "Not paid yet. Helpers can't accept this task until you pay." : "Not paid yet. The requester needs to pay before anyone can accept.")
+      : null,
   );
 
   if (Array.isArray(task.assignments) && task.assignments.length) {
@@ -331,6 +335,10 @@ function actionPanel(task, { isRequester, isHelper, isAdmin }) {
 
   const box = el("div", { class: "card" }, el("h4", {}, "Actions"));
   const buttons = [];
+
+  if (isRequester && task.help_type === "paid" && !task.funded && ["open", "accepted", "continue_later"].includes(s)) {
+    buttons.push(actionButton("Pay to publish this task", () => startPayment(id)));
+  }
 
   if (isHelper && (s === "accepted" || s === "continue_later")) {
     buttons.push(actionButton("I've arrived, start work", () => act("start", {}, "Work started.")));
@@ -487,6 +495,7 @@ async function loadProfile() {
     else field.value = v ?? "";
   }
   $("#request-verify").hidden = !["unverified", "rejected"].includes(p.verification_status);
+  loadPayouts();
   $("#verify-status").textContent =
     p.verification_status === "verified"
       ? "Identity verified. You can accept paid tasks."
@@ -620,6 +629,51 @@ async function loadAdmin() {
     );
   }
 }
+
+// ---------- payments ----------
+
+async function startPayment(taskId) {
+  const res = await run(() => api(`/api/tasks/${taskId}/funding`, { body: {} }));
+  if (res && res.url) window.location.href = res.url;
+}
+
+/** Handles the return from Stripe Checkout and the payout setup page. */
+async function handleReturns() {
+  const params = new URLSearchParams(window.location.search);
+  const taskId = params.get("funded_task");
+  const sessionId = params.get("session_id");
+  if (taskId && sessionId) {
+    await run(
+      () => api(`/api/tasks/${taskId}/funding/confirm`, { body: { session_id: sessionId } }),
+      "Payment received. Your task is now open to helpers.",
+    );
+    history.replaceState({}, "", "/");
+    openDetail(taskId);
+  } else if (params.get("funding_cancelled")) {
+    notify("Payment was cancelled. The task is not open to helpers yet.", "error");
+    history.replaceState({}, "", "/");
+  } else if (params.get("payouts")) {
+    notify("Payout setup saved. Your status is shown on your profile.", "ok");
+    history.replaceState({}, "", "/");
+  }
+}
+
+async function loadPayouts() {
+  const status = $("#payout-status");
+  try {
+    const data = await api("/api/me/payout-account");
+    status.textContent = data.ready
+      ? "Payouts are set up. You can accept paid tasks."
+      : "Set up payouts before you accept paid tasks. Stripe asks for your bank details and identity, not this app.";
+  } catch (err) {
+    status.textContent = err.message;
+  }
+}
+
+$("#payout-setup").addEventListener("click", async () => {
+  const res = await run(() => api("/api/me/payout-account", { body: {} }));
+  if (res && res.url) window.location.href = res.url;
+});
 
 boot();
 

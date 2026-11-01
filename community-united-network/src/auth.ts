@@ -59,7 +59,7 @@ export async function destroySession(token: string): Promise<void> {
 export function setSessionCookie(res: Response, token: string): void {
   res.cookie(COOKIE, token, {
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     secure: config.cookieSecure,
     path: "/",
     maxAge: config.sessionDays * 24 * 60 * 60 * 1000,
@@ -67,7 +67,7 @@ export function setSessionCookie(res: Response, token: string): void {
 }
 
 export function clearSessionCookie(res: Response): void {
-  res.clearCookie(COOKIE, { path: "/", sameSite: "strict", secure: config.cookieSecure });
+  res.clearCookie(COOKIE, { path: "/", sameSite: "lax", secure: config.cookieSecure });
 }
 
 function readCookie(header: string | undefined, name: string): string | undefined {

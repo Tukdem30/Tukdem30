@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireUser, requireVerified } from "../auth.js";
 import * as tasks from "../services/tasks.js";
+import { siteOrigin } from "../origin.js";
 
 export const taskRouter = Router();
 
@@ -26,6 +27,14 @@ taskRouter.get("/:id/history", requireUser, async (req, res) => {
 
 taskRouter.get("/:id/candidates", requireUser, async (req, res) => {
   res.json(await tasks.rankCandidates(req.user!, req.params.id as string));
+});
+
+taskRouter.post("/:id/funding", requireUser, async (req, res) => {
+  res.json(await tasks.startFunding(req.user!, req.params.id as string, siteOrigin(req)));
+});
+
+taskRouter.post("/:id/funding/confirm", requireUser, async (req, res) => {
+  res.json(await tasks.confirmFunding(req.user!, req.params.id as string, String(req.body?.session_id ?? "")));
 });
 
 taskRouter.post("/:id/accept", requireUser, requireVerified, async (req, res) => {

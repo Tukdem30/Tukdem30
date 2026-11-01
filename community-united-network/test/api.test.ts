@@ -1,9 +1,24 @@
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import * as payments from "../src/payments.js";
 import { createApp } from "../src/app.js";
 import { migrate, pool } from "../src/db.js";
 
 const app = createApp();
+
+// Stripe is replaced in tests. Each test sets what a completed Checkout payment looks like.
+const stripeState = vi.hoisted(() => ({
+  paid: null as null | { taskId: string; requesterId: string; amountCents: number; paymentIntentId: string; chargeId: string },
+}));
+vi.mock("../src/payments.js", () => ({
+  CURRENCY: "usd",
+  payoutsReady: vi.fn(async () => true),
+  transferToHelper: vi.fn(async () => undefined),
+  refundToRequester: vi.fn(async () => undefined),
+  createFundingCheckout: vi.fn(async () => ({ url: "https://checkout.example/test" })),
+  paidCheckout: vi.fn(async () => stripeState.paid),
+  startPayoutOnboarding: vi.fn(async () => ({ url: "https://onboard.example/test", accountId: "acct_test" })),
+}));
 const adultDob = "1990-05-17";
 let uniq = 0;
 
@@ -29,6 +44,24 @@ async function makeAdmin(id: string) {
 async function verify(adminAgent: request.Agent, userId: string) {
   const res = await adminAgent.post(`/api/admin/users/${userId}/verification`).send({ status: "verified" });
   expect(res.status).toBe(200);
+  // Stand-in for a finished Stripe payout setup, so paid tasks can pay this helper.
+  await pool.query("UPDATE users SET stripe_account_id = 'acct_test' WHERE id = $1", [userId]);
+}
+
+/** Test stand-in for a completed Stripe payment: records the hold the same way confirmFunding does. */
+async function fund(taskId: string) {
+  const { rows } = await pool.query<{ price_cents: number; helpers_needed: number }>(
+    "SELECT price_cents, helpers_needed FROM tasks WHERE id = $1",
+    [taskId],
+  );
+  await pool.query("INSERT INTO payment_events (task_id, kind, amount_cents) VALUES ($1, 'hold', $2)", [
+    taskId,
+    rows[0].price_cents * rows[0].helpers_needed,
+  ]);
+  await pool.query(
+    "UPDATE tasks SET funded = true, stripe_payment_intent_id = 'pi_test', stripe_charge_id = 'ch_test' WHERE id = $1",
+    [taskId],
+  );
 }
 
 async function newTask(agent: request.Agent, overrides: Record<string, unknown> = {}) {
@@ -50,6 +83,7 @@ async function newTask(agent: request.Agent, overrides: Record<string, unknown> 
     ...overrides,
   });
   expect(res.status).toBe(201);
+  if (res.body.help_type !== "volunteer") await fund(res.body.id);
   return res.body as { id: string; price_cents: number };
 }
 
@@ -78,6 +112,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await pool.query("TRUNCATE users, tasks CASCADE");
+  stripeState.paid = null;
+  vi.clearAllMocks();
 });
 
 afterAll(async () => {
@@ -133,7 +169,7 @@ describe("accounts", () => {
     });
     const cookie = res.headers["set-cookie"]?.[0] ?? "";
     expect(cookie).toMatch(/HttpOnly/i);
-    expect(cookie).toMatch(/SameSite=Strict/i);
+    expect(cookie).toMatch(/SameSite=Lax/i);
   });
 });
 
@@ -254,7 +290,7 @@ describe("cancellation", () => {
 });
 
 describe("change requests and partial completion", () => {
-  it("applies an approved price change, then pays a partial amount and refunds the rest", async () => {
+  it("blocks price changes once the task is paid, then pays a partial amount and refunds the rest", async () => {
     const requester = await newUser("need_help", "pc-req");
     const helper = await newUser("can_help", "pc-help");
     const admin = await newUser("both", "pc-admin");
@@ -272,20 +308,16 @@ describe("change requests and partial completion", () => {
     // The helper cannot approve their own change.
     expect((await helper.agent.post(`/api/tasks/changes/${change.body.id}/approve`).send({})).status).toBe(403);
 
+    // Once paid, the price is locked in; a change needs a new payment instead.
     const approved = await requester.agent.post(`/api/tasks/changes/${change.body.id}/approve`).send({});
-    expect(approved.status).toBe(200);
-    expect((await ledger(task.id)).held).toBe(6000);
-
-    // The agreement history records the original terms and the approved change.
-    const history = await requester.agent.get(`/api/tasks/${task.id}/history`);
-    expect(history.body.history.map((h: { version: number }) => h.version)).toEqual([1, 2]);
-    expect(history.body.history[1].snapshot.price_cents).toBe(6000);
+    expect(approved.status).toBe(409);
+    expect((await ledger(task.id)).held).toBe(5000);
 
     await helper.agent.post(`/api/tasks/${task.id}/start`).send({});
     await helper.agent.post(`/api/tasks/${task.id}/finish`).send({ outcome: "partially_completed", earned_cents: 2000 });
     await requester.agent.post(`/api/tasks/${task.id}/confirm`).send({});
 
-    expect(await ledger(task.id)).toMatchObject({ released: 1800, fee: 200, refund: 4000, held: 0 });
+    expect(await ledger(task.id)).toMatchObject({ released: 1800, fee: 200, refund: 3000, held: 0 });
   });
 
   it("requires a partial amount strictly between zero and the full rate", async () => {
@@ -428,5 +460,103 @@ describe("founders", () => {
     expect(list.body.founders.map((f: { founder_title: string }) => f.founder_title)).toContain("Co-founder");
     const me = await u.agent.get("/api/me");
     expect(me.body.founder_title).toBe("Co-founder");
+  });
+});
+
+describe("payments", () => {
+  it("does not let anyone accept a paid task before it is funded", async () => {
+    const requester = await newUser("need_help", "pay-req");
+    const helper = await newUser("can_help", "pay-help");
+    const admin = await newUser("both", "pay-admin");
+    await makeAdmin(admin.id);
+    await verify(admin.agent, helper.id);
+    const posted = await requester.agent.post("/api/tasks").send({
+      title: "Replace vent fan",
+      description: "Fan needs a new belt",
+      category: "repair",
+      city: "Colorado Springs",
+      zip: "80903",
+      schedule_type: "tomorrow",
+      helpers: "one",
+      price_cents: 2500,
+    });
+    expect(posted.body.funded).toBe(false);
+    const accept = await helper.agent.post(`/api/tasks/${posted.body.id}/accept`).send({});
+    expect(accept.status).toBe(409);
+  });
+
+  it("starts checkout for the requester only, and records the hold once payment is confirmed", async () => {
+    const requester = await newUser("need_help", "ck-req");
+    const other = await newUser("both", "ck-other");
+    const posted = await requester.agent.post("/api/tasks").send({
+      title: "Replace vent fan",
+      description: "Fan needs a new belt",
+      category: "repair",
+      city: "Colorado Springs",
+      zip: "80903",
+      schedule_type: "tomorrow",
+      helpers: "one",
+      price_cents: 2500,
+    });
+    const taskId = posted.body.id as string;
+
+    const start = await requester.agent.post(`/api/tasks/${taskId}/funding`).send({});
+    expect(start.body.url).toBe("https://checkout.example/test");
+    expect((await other.agent.post(`/api/tasks/${taskId}/funding`).send({})).status).toBe(403);
+
+    stripeState.paid = { taskId, requesterId: requester.id, amountCents: 2500, paymentIntentId: "pi_1", chargeId: "ch_1" };
+    const confirm = await requester.agent.post(`/api/tasks/${taskId}/funding/confirm`).send({ session_id: "cs_test_1" });
+    expect(confirm.body.funded).toBe(true);
+    expect((await ledger(taskId)).held).toBe(2500);
+
+    // Confirming the same payment again does not add a second hold.
+    await requester.agent.post(`/api/tasks/${taskId}/funding/confirm`).send({ session_id: "cs_test_1" });
+    expect((await ledger(taskId)).held).toBe(2500);
+  });
+
+  it("refuses a payment that belongs to a different task", async () => {
+    const requester = await newUser("need_help", "mm-req");
+    const posted = await requester.agent.post("/api/tasks").send({
+      title: "Replace vent fan",
+      description: "Fan needs a new belt",
+      category: "repair",
+      city: "Colorado Springs",
+      zip: "80903",
+      schedule_type: "tomorrow",
+      helpers: "one",
+      price_cents: 2500,
+    });
+    stripeState.paid = {
+      taskId: "00000000-0000-4000-8000-000000000000",
+      requesterId: requester.id,
+      amountCents: 2500,
+      paymentIntentId: "pi_2",
+      chargeId: "ch_2",
+    };
+    const res = await requester.agent.post(`/api/tasks/${posted.body.id}/funding/confirm`).send({ session_id: "cs_test_2" });
+    expect(res.status).toBe(400);
+  });
+
+  it("pays the helper's share through Stripe, with the fee kept by the platform", async () => {
+    const requester = await newUser("need_help", "tr-req");
+    const helper = await newUser("can_help", "tr-help");
+    const admin = await newUser("both", "tr-admin");
+    await makeAdmin(admin.id);
+    await verify(admin.agent, helper.id);
+
+    const payout = await helper.agent.post("/api/me/payout-account").send({});
+    expect(payout.body.url).toBe("https://onboard.example/test");
+    expect((await helper.agent.get("/api/me/payout-account")).body).toMatchObject({ has_account: true, ready: true });
+
+    const task = await newTask(requester.agent, { price_cents: 2500 });
+    await helper.agent.post(`/api/tasks/${task.id}/accept`).send({});
+    await helper.agent.post(`/api/tasks/${task.id}/start`).send({});
+    await helper.agent.post(`/api/tasks/${task.id}/finish`).send({ outcome: "completed" });
+    await requester.agent.post(`/api/tasks/${task.id}/confirm`).send({});
+
+    const transfer = vi.mocked(payments.transferToHelper);
+    expect(transfer).toHaveBeenCalledTimes(1);
+    expect(transfer.mock.calls[0][0]).toMatchObject({ accountId: "acct_test", amountCents: 2250, chargeId: "ch_test" });
+    expect(vi.mocked(payments.refundToRequester)).not.toHaveBeenCalled();
   });
 });

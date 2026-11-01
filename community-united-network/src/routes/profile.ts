@@ -5,6 +5,8 @@ import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { rankHelpers } from "../matching.js";
 import { tagList, zip } from "../validation.js";
+import { payoutsReady, startPayoutOnboarding } from "../payments.js";
+import { siteOrigin } from "../origin.js";
 
 export const profileRouter = Router();
 
@@ -114,4 +116,30 @@ foundersRouter.get("/", async (_req, res) => {
     `SELECT display_name, founder_title FROM users WHERE founder_title IS NOT NULL ORDER BY display_name`,
   );
   res.json({ founders: rows });
+});
+
+/** Whether the signed-in helper's Stripe payout account is ready to receive paid-task money. */
+profileRouter.get("/payout-account", requireUser, async (req, res) => {
+  const { rows } = await pool.query<{ stripe_account_id: string | null }>(
+    "SELECT stripe_account_id FROM users WHERE id = $1",
+    [req.user!.id],
+  );
+  const accountId = rows[0]?.stripe_account_id ?? null;
+  res.json({ has_account: Boolean(accountId), ready: await payoutsReady(accountId) });
+});
+
+/** Starts (or resumes) Stripe's hosted setup for the helper's payout account. */
+profileRouter.post("/payout-account", requireUser, async (req, res) => {
+  const { rows } = await pool.query<{ email: string; stripe_account_id: string | null }>(
+    "SELECT email, stripe_account_id FROM users WHERE id = $1",
+    [req.user!.id],
+  );
+  if (!rows[0]) throw new HttpError(404, "Account not found");
+  const { url, accountId } = await startPayoutOnboarding(
+    { id: req.user!.id, email: rows[0].email },
+    rows[0].stripe_account_id,
+    `${siteOrigin(req)}/?payouts=return`,
+  );
+  await pool.query("UPDATE users SET stripe_account_id = $2 WHERE id = $1", [req.user!.id, accountId]);
+  res.json({ url });
 });

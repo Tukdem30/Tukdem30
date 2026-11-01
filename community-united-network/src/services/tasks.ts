@@ -15,6 +15,7 @@ import {
 } from "../domain.js";
 import { HttpError } from "../errors.js";
 import { rankHelpers } from "../matching.js";
+import { createFundingCheckout, paidCheckout, payoutsReady, refundToRequester, transferToHelper } from "../payments.js";
 import { tagList, UUID_RE, zip } from "../validation.js";
 
 type Client = pg.PoolClient;
@@ -44,6 +45,9 @@ export interface TaskRow {
   proposed_outcome: string | null;
   proposed_earned_cents: number | null;
   earned_cents: number;
+  funded: boolean;
+  stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
   completed_at: Date | null;
   created_at: Date;
 }
@@ -222,24 +226,55 @@ async function addEvent(
   );
 }
 
-/** Pays each helper a gross amount, splitting out the platform fee. Refuses to overdraw escrow. */
-async function payOut(c: Client, taskId: string, payouts: { helperId: string; gross: number }[]): Promise<void> {
+/**
+ * Pays each helper a gross amount. The fee stays with the platform; the helper's net goes to their
+ * Stripe account. Refuses to overdraw what is held for the task.
+ */
+async function payOut(c: Client, t: TaskRow, payouts: { helperId: string; gross: number }[]): Promise<void> {
   const total = payouts.reduce((sum, p) => sum + p.gross, 0);
-  if (total > (await heldCents(c, taskId))) {
+  if (total > (await heldCents(c, t.id))) {
     throw new HttpError(409, "Not enough funds are held for this payout");
   }
-  for (const p of payouts) {
-    if (p.gross <= 0) continue;
+  const paying = payouts.filter((p) => p.gross > 0);
+  if (paying.length === 0) return;
+  if (!t.stripe_charge_id) throw new HttpError(409, "This task has no payment on file");
+
+  const { rows } = await c.query<{ id: string; stripe_account_id: string | null }>(
+    "SELECT id, stripe_account_id FROM users WHERE id = ANY($1)",
+    [paying.map((p) => p.helperId)],
+  );
+  const accounts = new Map(rows.map((r) => [r.id, r.stripe_account_id]));
+
+  for (const p of paying) {
     const { fee, net } = splitPayout(p.gross);
-    await addEvent(c, taskId, "release_helper", net, p.helperId);
-    await addEvent(c, taskId, "platform_fee", fee, p.helperId);
+    const accountId = accounts.get(p.helperId);
+    if (!accountId) throw new HttpError(409, "A helper has not set up a payout account");
+    await transferToHelper({
+      accountId,
+      amountCents: net,
+      chargeId: t.stripe_charge_id,
+      taskId: t.id,
+      helperId: p.helperId,
+      idempotencyKey: `payout:${t.id}:${p.helperId}:${t.earned_cents}:${p.gross}`,
+    });
+    await addEvent(c, t.id, "release_helper", net, p.helperId);
+    await addEvent(c, t.id, "platform_fee", fee, p.helperId);
   }
 }
 
-/** Returns whatever is still held to the requester. */
-async function refundRemainder(c: Client, taskId: string): Promise<number> {
-  const held = await heldCents(c, taskId);
-  await addEvent(c, taskId, "refund", held);
+/** Returns whatever is still held to the requester's card. */
+async function refundRemainder(c: Client, t: TaskRow): Promise<number> {
+  const held = await heldCents(c, t.id);
+  if (held > 0) {
+    if (!t.stripe_payment_intent_id) throw new HttpError(409, "This task has no payment on file to refund");
+    await refundToRequester({
+      paymentIntentId: t.stripe_payment_intent_id,
+      amountCents: held,
+      taskId: t.id,
+      idempotencyKey: `refund:${t.id}:${held}:${t.earned_cents}`,
+    });
+  }
+  await addEvent(c, t.id, "refund", held);
   return held;
 }
 
@@ -269,20 +304,9 @@ async function recordAgreement(c: Client, t: TaskRow, reason: string): Promise<v
   );
 }
 
-/** Keeps escrow equal to price x helper slots. Called whenever either input changes. */
-async function reconcileHold(c: Client, taskId: string): Promise<void> {
-  const { rows } = await c.query<TaskRow>("SELECT * FROM tasks WHERE id = $1", [taskId]);
-  const t = rows[0];
-  if (t.help_type !== "paid") return;
-  const target = t.price_cents * t.helpers_needed;
-  const held = await heldCents(c, taskId);
-  if (target > held) await addEvent(c, taskId, "hold", target - held);
-  if (target < held) await addEvent(c, taskId, "refund", held - target);
-}
-
 /** Public view of a task. Address is included only for the requester, assigned helpers, and admins. */
 function publicTask(t: TaskRow): Record<string, unknown> {
-  const { address_private: _addr, ...rest } = t;
+  const { address_private: _addr, stripe_payment_intent_id: _pi, stripe_charge_id: _ch, ...rest } = t;
   const fee = t.help_type === "paid" ? platformFee(t.price_cents) : 0;
   return { ...rest, helper_net_cents: t.price_cents - fee, platform_fee_cents: fee };
 }
@@ -485,8 +509,11 @@ export async function createTask(user: AuthUser, raw: unknown) {
       ],
     );
     const t = rows[0];
-    // Requester funds the full agreed amount up front. Test-mode ledger only; no card is charged.
-    await addEvent(c, t.id, "hold", t.price_cents * t.helpers_needed);
+    // Paid tasks stay unfunded until the requester pays through Stripe Checkout.
+    if (t.help_type === "volunteer") {
+      await c.query("UPDATE tasks SET funded = true WHERE id = $1", [t.id]);
+      t.funded = true;
+    }
     await recordAgreement(c, t, "Original terms");
     return publicTask(t);
   });
@@ -498,9 +525,18 @@ export async function acceptTask(user: AuthUser, id: string) {
     if (t.requester_id === user.id) throw new HttpError(403, "You cannot accept your own task");
     assertAllowed("accept", t.status);
 
-    const { rows: me } = await c.query("SELECT role_mode FROM users WHERE id = $1", [user.id]);
+    const { rows: me } = await c.query<{ role_mode: string; stripe_account_id: string | null }>(
+      "SELECT role_mode, stripe_account_id FROM users WHERE id = $1",
+      [user.id],
+    );
     if (me[0].role_mode === "need_help") {
       throw new HttpError(403, "Your profile is set to need help only. Change it to accept tasks.");
+    }
+    if (t.help_type === "paid") {
+      if (!t.funded) throw new HttpError(409, "The requester has not paid for this task yet");
+      if (!(await payoutsReady(me[0].stripe_account_id))) {
+        throw new HttpError(403, "Set up your payout account in your profile before accepting paid tasks");
+      }
     }
 
     const active = await activeAssignments(c, id);
@@ -622,7 +658,7 @@ async function settle(
   const gross = Math.max(0, perHelperTarget - t.earned_cents);
   await payOut(
     c,
-    t.id,
+    t,
     actives.map((a) => ({ helperId: a.helper_id, gross })),
   );
 
@@ -635,7 +671,7 @@ async function settle(
     return;
   }
 
-  await refundRemainder(c, t.id);
+  await refundRemainder(c, t);
   await c.query(
     `UPDATE task_assignments SET status = $2, ended_at = now() WHERE task_id = $1 AND status = 'active'`,
     [t.id, outcome === "cancelled" ? "cancelled" : "completed"],
@@ -683,8 +719,8 @@ export async function cancelTask(user: AuthUser, id: string, raw: unknown) {
       return { helperId: a.helper_id, gross: Math.max(0, Math.round(t.price_cents * pct) - t.earned_cents) };
     });
 
-    await payOut(c, id, payouts);
-    const refunded = await refundRemainder(c, id);
+    await payOut(c, t, payouts);
+    const refunded = await refundRemainder(c, t);
     await c.query(
       `UPDATE task_assignments SET status = 'cancelled', ended_at = now() WHERE task_id = $1 AND status = 'active'`,
       [id],
@@ -780,6 +816,9 @@ export async function resolveChangeRequest(user: AuthUser, changeId: string, app
       return { status: "declined" };
     }
 
+    if (t.funded && (cr.kind === "price" || cr.kind === "helper_count")) {
+      throw new HttpError(409, "This task is already paid. Price and helper changes need a new payment; cancel and repost instead.");
+    }
     const p = cr.proposed as Record<string, unknown>;
     switch (cr.kind) {
       case "price":
@@ -819,7 +858,6 @@ export async function resolveChangeRequest(user: AuthUser, changeId: string, app
     }
 
     if (cr.kind === "price" || cr.kind === "helper_count") {
-      await reconcileHold(c, t.id);
       // Keep open/accepted in sync with whether the slot count is now filled.
       const active = (await activeAssignments(c, t.id)).length;
       const { rows: fresh } = await c.query<{ helpers_needed: number; status: TaskStatus }>(
@@ -958,4 +996,73 @@ export async function adminQueue(admin: AuthUser) {
     ),
   ]);
   return { tasks: tasksRes.rows, verification_requests: usersRes.rows, safety_reports: reportsRes.rows };
+}
+
+// ---------- payment (Stripe Checkout, test mode first) ----------
+
+/** Requester starts paying for a paid task. Returns a Stripe Checkout link. */
+export async function startFunding(user: AuthUser, id: string, origin: string) {
+  const { rows } = await pool.query<TaskRow>("SELECT * FROM tasks WHERE id = $1", [id]);
+  const t = rows[0];
+  if (!t) throw new HttpError(404, "Task not found");
+  if (t.requester_id !== user.id) throw new HttpError(403, "Only the requester can pay for this task");
+  if (t.help_type !== "paid") throw new HttpError(400, "Volunteer tasks have no payment");
+  if (t.funded) throw new HttpError(409, "This task is already paid for");
+  if (!["open", "accepted", "continue_later"].includes(t.status)) {
+    throw new HttpError(409, `Payment cannot be started while the task is ${t.status}`);
+  }
+  const amount = t.price_cents * t.helpers_needed;
+  return createFundingCheckout({
+    taskId: t.id,
+    title: t.title,
+    amountCents: amount,
+    requesterId: user.id,
+    origin,
+  });
+}
+
+/** Records a completed Stripe payment against the task. Safe to call more than once. */
+export async function confirmFunding(user: AuthUser, id: string, sessionId: string) {
+  if (!sessionId || sessionId.length > 255) throw new HttpError(400, "Missing payment reference");
+  const paid = await paidCheckout(sessionId);
+  return withTx(async (c) => {
+    const t = await lockTask(c, id);
+    if (t.requester_id !== user.id) throw new HttpError(403, "Only the requester can confirm payment");
+    if (paid.taskId !== id || paid.requesterId !== user.id) {
+      throw new HttpError(400, "This payment is for a different task");
+    }
+
+    if (t.funded) {
+      if (t.stripe_payment_intent_id !== paid.paymentIntentId) {
+        // A second payment for the same task: return it so the requester is not charged twice.
+        await refundToRequester({
+          paymentIntentId: paid.paymentIntentId,
+          amountCents: paid.amountCents,
+          taskId: id,
+          idempotencyKey: `duplicate-refund:${paid.paymentIntentId}`,
+        });
+      }
+      return { status: t.status, funded: true };
+    }
+
+    const expected = t.price_cents * t.helpers_needed;
+    if (paid.amountCents !== expected) {
+      // The task changed after payment started. Return the money and ask for a new payment.
+      await refundToRequester({
+        paymentIntentId: paid.paymentIntentId,
+        amountCents: paid.amountCents,
+        taskId: id,
+        idempotencyKey: `mismatch-refund:${paid.paymentIntentId}`,
+      });
+      throw new HttpError(409, "The task changed after payment started. Your payment was refunded; please pay again.");
+    }
+
+    await addEvent(c, id, "hold", expected);
+    await c.query(
+      `UPDATE tasks SET funded = true, stripe_payment_intent_id = $2, stripe_charge_id = $3, updated_at = now()
+        WHERE id = $1`,
+      [id, paid.paymentIntentId, paid.chargeId],
+    );
+    return { status: t.status, funded: true };
+  });
 }
