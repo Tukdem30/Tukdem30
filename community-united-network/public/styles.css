@@ -1,10 +1,10 @@
 :root {
   --ink: #1d2433;
   --muted: #5b6475;
-  --accent: #1f6f5c;
+  --accent: #6a1fa8;
   --accent-ink: #ffffff;
   --card: #ffffff;
-  --page: #f5f7f4;
+  --page: #f7f4fb;
   --warn: #8a4b00;
   --danger: #9b1c1c;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -35,7 +35,7 @@ button.danger { background: var(--danger); border-color: var(--danger); }
 button.link { background: none; border: none; color: var(--accent); padding: 0; text-decoration: underline; }
 nav button { background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.4); }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 3px solid #f0b429;
+  outline: 3px solid #d63cf0;
   outline-offset: 2px;
 }
 
@@ -64,7 +64,7 @@ fieldset { border: 1px solid #d5dbe3; border-radius: 6px; display: grid; gap: 0.
 }
 .card h3 { margin: 0; font-size: 1.1rem; }
 .meta { color: var(--muted); font-size: 0.9rem; }
-.pill { display: inline-block; font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #e3efeb; color: var(--accent); margin-right: 0.3rem; }
+.pill { display: inline-block; font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #efe2fb; color: var(--accent); margin-right: 0.3rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
 .hint { color: var(--muted); font-size: 0.9rem; }
 #notice { min-height: 1.5rem; font-weight: 600; }
