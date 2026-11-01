@@ -1,10 +1,10 @@
 :root {
-  --ink: #1d2433;
-  --muted: #5b6475;
+  --ink: #f3f0f7;
+  --muted: #b6acc6;
   --accent: #6a1fa8;
   --accent-ink: #ffffff;
-  --card: #ffffff;
-  --page: #f7f4fb;
+  --card: #16131c;
+  --page: #000000;
   --warn: #8a4b00;
   --danger: #9b1c1c;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -30,9 +30,9 @@ button {
   color: var(--accent-ink);
   cursor: pointer;
 }
-button.secondary { background: #fff; color: var(--accent); }
+button.secondary { background: var(--card); color: #e9b8ff; border-color: #8e3fc4; }
 button.danger { background: var(--danger); border-color: var(--danger); }
-button.link { background: none; border: none; color: var(--accent); padding: 0; text-decoration: underline; }
+button.link { background: none; border: none; color: #e9b8ff; padding: 0; text-decoration: underline; }
 nav button { background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.4); }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 3px solid #d63cf0;
@@ -46,17 +46,18 @@ label:has(input[type="radio"]), label:has(input[type="checkbox"]) { display: fle
 input, select, textarea {
   font: inherit;
   padding: 0.45rem 0.6rem;
-  border: 1px solid #aab2bf;
+  border: 1px solid #4a3f5c;
   border-radius: 6px;
-  background: #fff;
+  background: #100d15;
+  color: var(--ink);
   max-width: 100%;
 }
-fieldset { border: 1px solid #d5dbe3; border-radius: 6px; display: grid; gap: 0.4rem; }
+fieldset { border: 1px solid #3a3149; border-radius: 6px; display: grid; gap: 0.4rem; }
 
 .cards { display: grid; gap: 0.75rem; }
 .card {
   background: var(--card);
-  border: 1px solid #dde3ea;
+  border: 1px solid #2e2740;
   border-radius: 8px;
   padding: 0.9rem 1rem;
   display: grid;
@@ -64,10 +65,10 @@ fieldset { border: 1px solid #d5dbe3; border-radius: 6px; display: grid; gap: 0.
 }
 .card h3 { margin: 0; font-size: 1.1rem; }
 .meta { color: var(--muted); font-size: 0.9rem; }
-.pill { display: inline-block; font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #efe2fb; color: var(--accent); margin-right: 0.3rem; }
+.pill { display: inline-block; font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #2a1740; color: #e9b8ff; margin-right: 0.3rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
 .hint { color: var(--muted); font-size: 0.9rem; }
 #notice { min-height: 1.5rem; font-weight: 600; }
 #notice.error { color: var(--danger); }
-#notice.ok { color: var(--accent); }
+#notice.ok { color: #c77dff; }
 .warn { color: var(--warn); }
