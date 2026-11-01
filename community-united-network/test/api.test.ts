@@ -388,3 +388,33 @@ describe("my tasks", () => {
     expect(theirs.body.tasks[0]).toMatchObject({ id: task.id, is_requester: true });
   });
 });
+
+describe("admin queue and verification requests", () => {
+  it("lets a person request verification once, and shows it in the admin queue", async () => {
+    const admin = await newUser("both", "q-admin");
+    await makeAdmin(admin.id);
+    const helper = await newUser("can_help", "q-help");
+    const first = await helper.agent.post("/api/me/request-verification").send({});
+    expect(first.body.verification_status).toBe("pending");
+    expect((await helper.agent.post("/api/me/request-verification").send({})).status).toBe(409);
+
+    const queue = await admin.agent.get("/api/admin/queue");
+    expect(queue.body.verification_requests.map((u: { id: string }) => u.id)).toContain(helper.id);
+    expect((await helper.agent.get("/api/admin/queue")).status).toBe(403);
+  });
+
+  it("shows paused and disputed tasks with their status", async () => {
+    const requester = await newUser("need_help", "q-req");
+    const helper = await newUser("can_help", "q-h2");
+    const admin = await newUser("both", "q-admin2");
+    await makeAdmin(admin.id);
+    await verify(admin.agent, helper.id);
+    const task = await newTask(requester.agent);
+    await helper.agent.post(`/api/tasks/${task.id}/accept`).send({});
+    await helper.agent.post(`/api/tasks/${task.id}/start`).send({});
+    await helper.agent.post(`/api/tasks/${task.id}/safety-reports`).send({ description: "Loose ladder, stopping.", stop_task: true });
+    const queue = await admin.agent.get("/api/admin/queue");
+    expect(queue.body.tasks[0]).toMatchObject({ id: task.id, status: "paused_safety" });
+    expect(queue.body.safety_reports).toHaveLength(1);
+  });
+});

@@ -21,7 +21,7 @@ const profileSchema = z.object({
 });
 
 const PROFILE_COLUMNS = `id, display_name, role_mode, city, state, zip, bio, availability,
-  skills, tools, verification_status, created_at`;
+  skills, tools, verification_status, is_admin, created_at`;
 
 profileRouter.get("/", requireUser, async (req, res) => {
   const { rows } = await pool.query(`SELECT ${PROFILE_COLUMNS} FROM users WHERE id = $1`, [req.user!.id]);
@@ -93,4 +93,15 @@ profileRouter.get("/matches", requireUser, async (req, res) => {
       reasons: match!.reasons,
     }));
   res.json({ matches: ranked });
+});
+
+/** A person asks for identity verification. Admins approve or reject from the admin queue. */
+profileRouter.post("/request-verification", requireUser, async (req, res) => {
+  const { rowCount } = await pool.query(
+    `UPDATE users SET verification_status = 'pending'
+      WHERE id = $1 AND verification_status IN ('unverified', 'rejected')`,
+    [req.user!.id],
+  );
+  if (!rowCount) throw new HttpError(409, "Verification is already requested or complete");
+  res.json({ verification_status: "pending" });
 });

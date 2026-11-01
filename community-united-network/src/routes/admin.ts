@@ -7,6 +7,10 @@ export const adminRouter = Router();
 
 adminRouter.use(requireUser, requireAdmin);
 
+adminRouter.get("/queue", async (req, res) => {
+  res.json(await tasks.adminQueue(req.user!));
+});
+
 adminRouter.get("/safety-reports", async (req, res) => {
   res.json(await tasks.listSafetyReports(req.user!));
 });

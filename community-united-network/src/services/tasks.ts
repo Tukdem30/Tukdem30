@@ -934,3 +934,28 @@ export async function markSafetyReviewed(admin: AuthUser, reportId: string) {
   if (!rowCount) throw new HttpError(404, "Report not found");
   return { ok: true };
 }
+
+/** Everything an admin needs in one place: tasks needing a decision, verification requests, and safety reports. */
+export async function adminQueue(admin: AuthUser) {
+  if (!admin.is_admin) throw new HttpError(403, "Admins only");
+  const [tasksRes, usersRes, reportsRes] = await Promise.all([
+    pool.query(
+      `SELECT t.id, t.title, t.status, t.price_cents, t.helpers_needed, t.updated_at,
+              r.display_name AS requester_name
+         FROM tasks t JOIN users r ON r.id = t.requester_id
+        WHERE t.status IN ('paused_safety', 'disputed')
+        ORDER BY t.updated_at DESC LIMIT 100`,
+    ),
+    pool.query(
+      `SELECT id, display_name, email, role_mode, city, zip, created_at
+         FROM users WHERE verification_status = 'pending'
+        ORDER BY created_at LIMIT 100`,
+    ),
+    pool.query(
+      `SELECT s.id, s.task_id, s.description, s.stopped_task, s.created_at, t.title, t.status AS task_status
+         FROM safety_reports s JOIN tasks t ON t.id = s.task_id
+        WHERE s.status = 'open' ORDER BY s.created_at LIMIT 100`,
+    ),
+  ]);
+  return { tasks: tasksRes.rows, verification_requests: usersRes.rows, safety_reports: reportsRes.rows };
+}

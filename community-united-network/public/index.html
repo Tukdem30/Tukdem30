@@ -16,6 +16,7 @@
       <button data-view="mine">My tasks</button>
       <button data-view="post">Post a task</button>
       <button data-view="profile">My profile</button>
+      <button data-view="admin" id="admin-nav" hidden>Admin</button>
       <button id="logout">Log out</button>
     </nav>
   </header>
@@ -150,6 +151,18 @@
         <button type="submit">Save profile</button>
       </form>
       <p id="verify-status" class="hint"></p>
+      <button id="request-verify" type="button" hidden>Request identity verification</button>
+    </section>
+
+    <section id="admin" class="view" hidden>
+      <h2>Admin queue</h2>
+      <p class="hint">Safety reports, tasks that need a decision, and verification requests.</p>
+      <h3>Safety reports</h3>
+      <div id="admin-safety" class="cards"></div>
+      <h3>Paused and disputed tasks</h3>
+      <div id="admin-tasks" class="cards"></div>
+      <h3>Verification requests</h3>
+      <div id="admin-verify" class="cards"></div>
     </section>
   </main>
 

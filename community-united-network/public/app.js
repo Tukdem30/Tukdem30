@@ -70,6 +70,7 @@ function showView(name) {
   if (name === "matches") loadMatches();
   if (name === "mine") loadMine();
   if (name === "profile") loadProfile();
+  if (name === "admin") loadAdmin();
   if (name === "post") $("#post-form").scrollIntoView({ block: "start" });
 }
 
@@ -86,6 +87,7 @@ async function boot() {
   try {
     state.me = await api("/api/me");
     setLoggedIn(true);
+    $("#admin-nav").hidden = !state.me.is_admin;
     showView("browse");
   } catch {
     state.me = null;
@@ -210,7 +212,8 @@ async function openDetail(id) {
   if (!task) return;
   const isRequester = task.viewer_role === "requester";
   const isHelper = task.viewer_role === "helper";
-  const isParty = isRequester || isHelper || task.viewer_role === "admin";
+  const isAdmin = task.viewer_role === "admin";
+  const isParty = isRequester || isHelper || isAdmin;
   const panel = $("#task-detail");
   panel.hidden = false;
   panel.replaceChildren();
@@ -269,7 +272,8 @@ async function openDetail(id) {
     }
   }
 
-  if (isParty) panel.append(actionPanel(task, { isRequester, isHelper }));
+  if (isParty) panel.append(actionPanel(task, { isRequester, isHelper, isAdmin }));
+  if (isAdmin) panel.append(adminResolvePanel(task));
   if (isRequester) await appendCandidates(panel, id);
 
   panel.scrollIntoView({ block: "start" });
@@ -303,7 +307,7 @@ function actionButton(label, onclick, cls = "") {
   return el("button", { type: "button", class: cls, onclick }, label);
 }
 
-function actionPanel(task, { isRequester, isHelper }) {
+function actionPanel(task, { isRequester, isHelper, isAdmin }) {
   const id = task.id;
   const s = task.status;
   const refresh = () => openDetail(id);
@@ -466,6 +470,7 @@ async function loadProfile() {
     else if (Array.isArray(v)) field.value = v.join(", ");
     else field.value = v ?? "";
   }
+  $("#request-verify").hidden = !["unverified", "rejected"].includes(p.verification_status);
   $("#verify-status").textContent =
     p.verification_status === "verified"
       ? "Identity verified. You can accept paid tasks."
@@ -489,5 +494,115 @@ $("#profile-form").addEventListener("submit", async (e) => {
   const res = await run(() => api("/api/me", { method: "PUT", body }), "Profile saved.");
   if (res) loadProfile();
 });
+
+$("#request-verify").addEventListener("click", async () => {
+  const res = await run(() => api("/api/me/request-verification", { body: {} }), "Verification requested. An admin will review it.");
+  if (res) loadProfile();
+});
+
+// ---------- admin ----------
+
+/** Admin decision panel on a paused or disputed task. Uses the admin API. */
+function adminResolvePanel(task) {
+  if (!["paused_safety", "disputed"].includes(task.status)) return el("div");
+  const outcome = el(
+    "select",
+    { name: "outcome" },
+    el("option", { value: "completed" }, "Completed (pay full rate)"),
+    el("option", { value: "partially_completed" }, "Partially completed"),
+    el("option", { value: "cancelled" }, "Cancelled"),
+    el("option", { value: "in_progress" }, "Resume work"),
+  );
+  const earned = el("input", { type: "number", min: "0", step: "0.01", placeholder: "Earned per helper ($)" });
+  const note = el("input", { maxlength: "500", placeholder: "Note for the record" });
+  return el(
+    "div",
+    { class: "card" },
+    el("h4", {}, "Admin decision"),
+    el("label", {}, "Outcome", outcome),
+    el("label", {}, "Amount per helper (partial or cancelled)", earned),
+    el("label", {}, "Note", note),
+    el(
+      "div",
+      { class: "actions" },
+      actionButton("Resolve", async () => {
+        const body = { outcome: outcome.value, note: note.value };
+        if (outcome.value === "partially_completed" || outcome.value === "cancelled") {
+          body.earned_cents = toCents(earned.value || 0);
+        }
+        const res = await run(() => api(`/api/admin/tasks/${task.id}/resolve`, { body }), "Task resolved.");
+        if (res) openDetail(task.id);
+      }),
+    ),
+  );
+}
+
+function adminRow(parts, buttons) {
+  return el("div", { class: "card" }, ...parts, el("div", { class: "actions" }, buttons));
+}
+
+async function loadAdmin() {
+  const data = await run(() => api("/api/admin/queue"));
+  if (!data) return;
+
+  const safety = $("#admin-safety");
+  safety.replaceChildren();
+  if (!data.safety_reports.length) safety.append(el("p", { class: "hint" }, "No open safety reports."));
+  for (const r of data.safety_reports) {
+    safety.append(
+      adminRow(
+        [
+          el("strong", {}, r.title),
+          el("div", { class: "meta" }, `Task: ${r.task_status.replaceAll("_", " ")}${r.stopped_task ? " · work was stopped" : ""}`),
+          el("div", {}, r.description),
+        ],
+        [
+          actionButton("Open task", () => openDetail(r.task_id), "secondary"),
+          actionButton("Mark reviewed", async () => {
+            const res = await run(() => api(`/api/admin/safety-reports/${r.id}/review`, { body: {} }), "Marked reviewed.");
+            if (res) loadAdmin();
+          }),
+        ],
+      ),
+    );
+  }
+
+  const tasksBox = $("#admin-tasks");
+  tasksBox.replaceChildren();
+  if (!data.tasks.length) tasksBox.append(el("p", { class: "hint" }, "Nothing waiting for a decision."));
+  for (const t of data.tasks) {
+    tasksBox.append(
+      adminRow(
+        [
+          el("strong", {}, t.title),
+          el("div", { class: "meta" }, `${t.status.replaceAll("_", " ")} · requested by ${t.requester_name} · ${money(t.price_cents)} per helper`),
+        ],
+        [actionButton("Decide", () => openDetail(t.id))],
+      ),
+    );
+  }
+
+  const verify = $("#admin-verify");
+  verify.replaceChildren();
+  if (!data.verification_requests.length) verify.append(el("p", { class: "hint" }, "No verification requests."));
+  for (const u of data.verification_requests) {
+    const setStatus = (status) => async () => {
+      const res = await run(
+        () => api(`/api/admin/users/${u.id}/verification`, { body: { status } }),
+        status === "verified" ? "Verified." : "Rejected.",
+      );
+      if (res) loadAdmin();
+    };
+    verify.append(
+      adminRow(
+        [
+          el("strong", {}, u.display_name),
+          el("div", { class: "meta" }, `${u.email} · ${u.role_mode.replaceAll("_", " ")} · ${u.city || ""} ${u.zip || ""}`),
+        ],
+        [actionButton("Verify", setStatus("verified")), actionButton("Reject", setStatus("rejected"), "danger")],
+      ),
+    );
+  }
+}
 
 boot();
