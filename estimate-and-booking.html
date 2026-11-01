@@ -1,0 +1,72 @@
+<!-- G3 Repairs: Estimate request + appointment section
+     Paste this block into the page just above the footer.
+     Before publishing, replace the three [PLACEHOLDERS]:
+       [FORM_ENDPOINT]  the form address from your form service (see notes below)
+       [BOOKING_URL]    your Google Calendar appointment page link
+       [PHONE]          your business phone number
+-->
+<style>
+  .g3-cta { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1d1d1f; padding: 2rem 16px; max-width: 760px; margin: 0 auto; box-sizing: border-box; }
+  .g3-cta * { box-sizing: border-box; }
+  .g3-cta h2 { font-size: 1.6rem; margin: 0 0 .5rem; }
+  .g3-cta p { line-height: 1.5; margin: 0 0 1rem; }
+  .g3-cta .g3-card { background: #f5f5f7; border-radius: 10px; padding: 1.25rem; margin-bottom: 2rem; }
+  .g3-cta label { display: block; font-weight: 600; margin: .9rem 0 .3rem; }
+  .g3-cta input, .g3-cta select, .g3-cta textarea { width: 100%; font: inherit; padding: .65rem .75rem; border: 1px solid #b8b8c0; border-radius: 6px; background: #fff; color: inherit; }
+  .g3-cta textarea { min-height: 120px; resize: vertical; }
+  .g3-cta button, .g3-cta .g3-btn { display: inline-block; margin-top: 1.25rem; padding: .8rem 1.4rem; font: inherit; font-weight: 600; background: #0b5cad; color: #fff; border: 0; border-radius: 6px; text-decoration: none; cursor: pointer; }
+  .g3-cta .g3-hp { position: absolute; left: -9999px; height: 0; overflow: hidden; }
+  .g3-cta .g3-note { font-size: .9rem; color: #555; margin-top: .75rem; }
+  @media (prefers-color-scheme: dark) {
+    .g3-cta { color: #f5f5f7; }
+    .g3-cta .g3-card { background: #1c1c1e; }
+    .g3-cta input, .g3-cta select, .g3-cta textarea { background: #2c2c2e; border-color: #5a5a62; color: #f5f5f7; }
+    .g3-cta .g3-note { color: #b0b0b8; }
+  }
+</style>
+
+<section class="g3-cta" id="estimate">
+  <h2>Request a Free Estimate</h2>
+  <p>Tell us what's wrong and we'll reply with a quote before any work starts.</p>
+
+  <div class="g3-card">
+    <form action="[FORM_ENDPOINT]" method="POST">
+      <!-- Hidden spam trap: real people never fill this in -->
+      <input class="g3-hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+      <label for="g3-name">Name</label>
+      <input id="g3-name" name="name" type="text" autocomplete="name" required>
+
+      <label for="g3-phone">Phone</label>
+      <input id="g3-phone" name="phone" type="tel" autocomplete="tel" required>
+
+      <label for="g3-email">Email (optional)</label>
+      <input id="g3-email" name="email" type="email" autocomplete="email">
+
+      <label for="g3-service">What do you need?</label>
+      <select id="g3-service" name="service" required>
+        <option value="">Choose one</option>
+        <option>Electronics repair</option>
+        <option>Automotive repair</option>
+        <option>Woodford's Custom Renovations</option>
+        <option>Other / not sure</option>
+      </select>
+
+      <label for="g3-details">Describe the problem or project</label>
+      <textarea id="g3-details" name="details" required></textarea>
+
+      <label for="g3-when">Preferred contact time (optional)</label>
+      <input id="g3-when" name="preferred_time" type="text" placeholder="e.g. weekday mornings">
+
+      <button type="submit">Send Request</button>
+      <p class="g3-note">We'll reply by phone or email. For urgent help, call [PHONE].</p>
+    </form>
+  </div>
+</section>
+
+<section class="g3-cta" id="appointment">
+  <h2>Book an Appointment</h2>
+  <p>Pick a time that works for you on our booking calendar. You'll get a confirmation by email.</p>
+  <a class="g3-btn" href="[BOOKING_URL]" target="_blank" rel="noopener">Book an Appointment</a>
+  <p class="g3-note">Prefer to talk first? Call [PHONE].</p>
+</section>
