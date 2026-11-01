@@ -142,6 +142,49 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_account_id text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_public boolean NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT 'en';
+
+CREATE TABLE IF NOT EXISTS conversations (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_a    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  member_b    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CHECK (member_a < member_b),
+  UNIQUE (member_a, member_b)
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id              bigserial PRIMARY KEY,
+  conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  sender_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body            text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+  source_lang     text NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, id);
+
+CREATE TABLE IF NOT EXISTS message_translations (
+  message_id  bigint NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  target_lang text NOT NULL,
+  body        text NOT NULL,
+  PRIMARY KEY (message_id, target_lang)
+);
+
+CREATE TABLE IF NOT EXISTS blocks (
+  blocker_id  uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blocked_id  uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (blocker_id, blocked_id)
+);
+
+CREATE TABLE IF NOT EXISTS message_reports (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id  bigint NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  reporter_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason      text NOT NULL CHECK (char_length(reason) BETWEEN 3 AND 500),
+  status      text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reviewed')),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS funded boolean NOT NULL DEFAULT false;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS stripe_payment_intent_id text;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS stripe_charge_id text;

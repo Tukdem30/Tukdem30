@@ -72,6 +72,7 @@ function showView(name) {
   if (name === "profile") loadProfile();
   if (name === "admin") loadAdmin();
   if (name === "members") loadMembers();
+  if (name === "messages") loadConversations();
   if (name === "post") $("#post-form").scrollIntoView({ block: "start" });
 }
 
@@ -504,6 +505,12 @@ $("#post-form").addEventListener("submit", async (e) => {
 async function loadProfile() {
   const p = await run(() => api("/api/me"));
   if (!p) return;
+  const langSelect = $("#profile-form").elements.namedItem("language");
+  if (!langSelect.options.length) {
+    const { languages } = await api("/api/languages");
+    for (const l of languages) langSelect.append(new Option(l.name, l.code));
+  }
+  langSelect.value = p.language || "en";
   const form = $("#profile-form");
   for (const [k, v] of Object.entries(p)) {
     const field = form.elements.namedItem(k);
@@ -536,6 +543,7 @@ $("#profile-form").addEventListener("submit", async (e) => {
     availability: f.get("availability"),
     bio: f.get("bio"),
     profile_public: f.get("profile_public") === "on",
+    language: f.get("language") || undefined,
   };
   const res = await run(() => api("/api/me", { method: "PUT", body }), "Profile saved.");
   if (res) loadProfile();
@@ -755,14 +763,86 @@ async function loadMembers() {
   }
 }
 
+// ---------- messages ----------
+
+const chat = { id: null, memberId: null, name: "" };
+
+async function loadConversations() {
+  const data = await run(() => api("/api/chat/conversations"));
+  const list = $("#conv-list");
+  list.replaceChildren();
+  $("#conv-view").hidden = true;
+  if (!data) return;
+  if (data.conversations.length === 0) list.append(el("p", { class: "hint" }, "No conversations yet. Open a member's profile in the Community section to start one."));
+  for (const c of data.conversations) {
+    list.append(
+      adminRow([el("strong", {}, c.display_name)], [actionButton("Open", () => openConversation(c.id, c.member_id, c.display_name), "secondary")]),
+    );
+  }
+}
+
+async function openConversation(id, memberId, name) {
+  chat.id = id;
+  chat.memberId = memberId;
+  chat.name = name;
+  const data = await run(() => api(`/api/chat/conversations/${id}/messages`));
+  if (!data) return;
+  $("#conv-title").textContent = name;
+  const box = $("#conv-messages");
+  box.replaceChildren();
+  if (data.messages.length === 0) box.append(el("p", { class: "hint" }, "Say hello."));
+  for (const m of data.messages) {
+    const parts = [el("div", { class: "meta" }, m.mine ? "You" : name), el("div", {}, m.body)];
+    if (m.translated) {
+      parts.push(el("details", {}, el("summary", { class: "meta" }, "Translated. Show original"), el("div", { class: "meta" }, m.original)));
+    }
+    if (!m.mine) parts.push(actionButton("Report", () => reportMessage(m.id), "secondary"));
+    box.append(el("article", { class: "card" }, ...parts));
+  }
+  $$(".view").forEach((v) => (v.hidden = v.id !== "messages"));
+  $("#conv-view").hidden = false;
+  box.lastElementChild?.scrollIntoView({ block: "end" });
+}
+
+async function startConversation(memberId, name) {
+  const res = await run(() => api("/api/chat/conversations", { body: { member_id: memberId } }));
+  if (res) openConversation(res.id, memberId, name);
+}
+
+async function reportMessage(messageId) {
+  const reason = window.prompt("What is wrong with this message? (reported to the admin team)");
+  if (!reason || reason.trim().length < 3) return;
+  await run(() => api(`/api/chat/messages/${messageId}/report`, { body: { reason: reason.trim() } }), "Report sent. Thank you.");
+}
+
+$("#msg-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = new FormData(e.target).get("body");
+  const sent = await run(() => api(`/api/chat/conversations/${chat.id}/messages`, { body: { body: String(body).trim() } }));
+  if (sent) {
+    e.target.reset();
+    openConversation(chat.id, chat.memberId, chat.name);
+  }
+});
+
+$("#conv-back").addEventListener("click", () => loadConversations());
+
+$("#conv-block").addEventListener("click", async () => {
+  if (!window.confirm(`Block ${chat.name}? You won't be able to message each other.`)) return;
+  const res = await run(() => api("/api/chat/blocks", { body: { member_id: chat.memberId } }), "Blocked.");
+  if (res) loadConversations();
+});
+
 async function showMember(id) {
   const data = await run(() => api(`/api/members/${id}`));
   if (!data) return;
   const m = data.member;
   const panel = $("#member-detail");
   panel.hidden = false;
+  const canMessage = state.me && state.me.verification_status === "verified" && m.id !== state.me.id;
   panel.replaceChildren(
     el("button", { type: "button", class: "secondary", onclick: () => { panel.hidden = true; loadMembers(); } }, "← Back to directory"),
+    canMessage ? el("button", { type: "button", onclick: () => startConversation(m.id, m.display_name) }, "Message") : null,
     el("h3", {}, m.display_name, m.verified ? el("span", { class: "pill" }, "Verified") : null),
     el("div", { class: "meta" }, `${m.role_mode.replaceAll("_", " ")}${m.city ? ` · ${m.city}` : ""}${m.state ? `, ${m.state}` : ""}`),
     m.bio ? el("p", {}, m.bio) : null,

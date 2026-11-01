@@ -25,6 +25,7 @@
       <button data-view="post">Post a task</button>
       <button data-view="profile">My profile</button>
       <button data-view="members">Community</button>
+      <button data-view="messages">Messages</button>
       <button data-view="admin" id="admin-nav" hidden>Admin</button>
       <button id="logout">Log out</button>
     </nav>
@@ -163,6 +164,7 @@
         <label>Availability <input name="availability" maxlength="300" /></label>
         <label>About you <textarea name="bio" rows="3" maxlength="1000"></textarea></label>
         <label><input type="checkbox" name="profile_public" /> Show my profile in the community directory</label>
+        <label>My language for messages <select name="language"></select></label>
         <button type="submit">Save profile</button>
       </form>
       <p id="verify-status" class="hint"></p>
@@ -171,6 +173,24 @@
         <h3>Get paid</h3>
         <p id="payout-status" class="hint"></p>
         <button id="payout-setup" type="button">Set up payouts</button>
+      </div>
+    </section>
+
+    <section id="messages" class="view" hidden>
+      <h2>Messages</h2>
+      <p class="hint">Messages stay in the app. Phone numbers and email addresses can't be sent. Each message shows in your language.</p>
+      <div id="conv-list" class="cards"></div>
+      <div id="conv-view" class="card" hidden>
+        <div class="actions">
+          <button type="button" class="secondary" id="conv-back">← Back to messages</button>
+          <button type="button" class="danger" id="conv-block">Block this member</button>
+        </div>
+        <h3 id="conv-title"></h3>
+        <div id="conv-messages" class="cards"></div>
+        <form id="msg-form">
+          <label>Message <textarea name="body" rows="3" maxlength="2000" required></textarea></label>
+          <button type="submit">Send</button>
+        </form>
       </div>
     </section>
 

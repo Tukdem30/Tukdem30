@@ -10,6 +10,11 @@ const app = createApp();
 const stripeState = vi.hoisted(() => ({
   paid: null as null | { taskId: string; requesterId: string; amountCents: number; paymentIntentId: string; chargeId: string },
 }));
+vi.mock("../src/translate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/translate.js")>()),
+  translationEnabled: () => true,
+  translateText: vi.fn(async (text: string, target: string) => `[${target}] ${text}`),
+}));
 vi.mock("../src/payments.js", () => ({
   CURRENCY: "usd",
   payoutsReady: vi.fn(async () => true),
@@ -584,5 +589,85 @@ describe("community directory", () => {
 
     expect((await request(app).get(`/api/members/${hidden.id}`)).status).toBe(404);
     expect((await request(app).get(`/api/members/${shown.id}`)).status).toBe(200);
+  });
+});
+
+describe("chat", () => {
+  async function member(label: string, language: string) {
+    const u = await newUser("both", label);
+    await u.agent.put("/api/me").send({ display_name: label, profile_public: true, language });
+    return u;
+  }
+
+  it("lets verified members message each other, translated into the reader's language", async () => {
+    const admin = await newUser("both", "chat-admin");
+    await makeAdmin(admin.id);
+    const es = await member("chat-es", "es");
+    const de = await member("chat-de", "de");
+    await verify(admin.agent, es.id);
+    await verify(admin.agent, de.id);
+
+    const conv = await es.agent.post("/api/chat/conversations").send({ member_id: de.id });
+    expect(conv.status).toBe(201);
+    const sent = await es.agent.post(`/api/chat/conversations/${conv.body.id}/messages`).send({ body: "Hola, ¿tienes tiempo mañana?" });
+    expect(sent.status).toBe(201);
+    expect(sent.body.body).toBe("Hola, ¿tienes tiempo mañana?");
+
+    const receiverView = await de.agent.get(`/api/chat/conversations/${conv.body.id}/messages`);
+    expect(receiverView.body.messages[0].body).toBe("[de] Hola, ¿tienes tiempo mañana?");
+    expect(receiverView.body.messages[0].original).toBe("Hola, ¿tienes tiempo mañana?");
+    expect(receiverView.body.messages[0].translated).toBe(true);
+
+    const senderView = await es.agent.get(`/api/chat/conversations/${conv.body.id}/messages`);
+    expect(senderView.body.messages[0].translated).toBe(false);
+  });
+
+  it("keeps phone numbers and email addresses out of messages", async () => {
+    const admin = await newUser("both", "chat-admin2");
+    await makeAdmin(admin.id);
+    const a = await member("chat-a", "en");
+    const b = await member("chat-b", "en");
+    await verify(admin.agent, a.id);
+    await verify(admin.agent, b.id);
+    const conv = await a.agent.post("/api/chat/conversations").send({ member_id: b.id });
+    const phone = await a.agent.post(`/api/chat/conversations/${conv.body.id}/messages`).send({ body: "Call me at 555-867-5309" });
+    const email = await a.agent.post(`/api/chat/conversations/${conv.body.id}/messages`).send({ body: "mail me at jo@example.com" });
+    const ok = await a.agent.post(`/api/chat/conversations/${conv.body.id}/messages`).send({ body: "Fan is on the roof, bring a ladder" });
+    expect(phone.status).toBe(400);
+    expect(email.status).toBe(400);
+    expect(ok.status).toBe(201);
+  });
+
+  it("blocks messages to people who are not verified, not listed, or who blocked you", async () => {
+    const admin = await newUser("both", "chat-admin3");
+    await makeAdmin(admin.id);
+    const sender = await member("chat-sender", "en");
+    const blocker = await member("chat-blocker", "en");
+    await verify(admin.agent, sender.id);
+    await verify(admin.agent, blocker.id);
+    const unverified = await newUser("both", "chat-unverified");
+    await unverified.agent.put("/api/me").send({ profile_public: true });
+
+    // Unverified recipient
+    expect((await sender.agent.post("/api/chat/conversations").send({ member_id: unverified.id })).status).toBe(403);
+
+    // Blocked
+    await blocker.agent.post("/api/chat/blocks").send({ member_id: sender.id });
+    expect((await sender.agent.post("/api/chat/conversations").send({ member_id: blocker.id })).status).toBe(403);
+  });
+
+  it("lets members report a message, and lists the report for admins", async () => {
+    const admin = await newUser("both", "chat-admin4");
+    await makeAdmin(admin.id);
+    const a = await member("chat-ra", "en");
+    const b = await member("chat-rb", "en");
+    await verify(admin.agent, a.id);
+    await verify(admin.agent, b.id);
+    const conv = await a.agent.post("/api/chat/conversations").send({ member_id: b.id });
+    const msg = await a.agent.post(`/api/chat/conversations/${conv.body.id}/messages`).send({ body: "Something is off here" });
+    const report = await b.agent.post(`/api/chat/messages/${msg.body.id}/report`).send({ reason: "Harassing message" });
+    expect(report.status).toBe(201);
+    const queue = await admin.agent.get("/api/admin/reports");
+    expect(queue.body.reports[0].reason).toBe("Harassing message");
   });
 });

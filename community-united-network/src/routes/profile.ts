@@ -7,6 +7,7 @@ import { rankHelpers } from "../matching.js";
 import { tagList, zip } from "../validation.js";
 import { payoutsReady, startPayoutOnboarding } from "../payments.js";
 import { siteOrigin } from "../origin.js";
+import { isSupportedLanguage, LANGUAGES } from "../translate.js";
 
 export const profileRouter = Router();
 
@@ -21,10 +22,11 @@ const profileSchema = z.object({
   skills: tagList.optional(),
   tools: tagList.optional(),
   profile_public: z.boolean().optional(),
+  language: z.string().refine((c) => isSupportedLanguage(c), "Unsupported language").optional(),
 });
 
 const PROFILE_COLUMNS = `id, display_name, role_mode, city, state, zip, bio, availability,
-  skills, tools, verification_status, is_admin, founder_title, profile_public, created_at`;
+  skills, tools, verification_status, is_admin, founder_title, profile_public, language, created_at`;
 
 profileRouter.get("/", requireUser, async (req, res) => {
   const { rows } = await pool.query(`SELECT ${PROFILE_COLUMNS} FROM users WHERE id = $1`, [req.user!.id]);
@@ -186,3 +188,9 @@ function toPublicMember(r: Record<string, unknown>) {
     founder_title: r.founder_title,
   };
 }
+
+/** Languages a member can choose for their messages. */
+export const languagesRouter = Router();
+languagesRouter.get("/", (_req, res) => {
+  res.json({ languages: LANGUAGES });
+});
