@@ -232,8 +232,25 @@ async function openDetail(id) {
   const isAdmin = task.viewer_role === "admin";
   const isParty = isRequester || isHelper || isAdmin;
   const panel = $("#task-detail");
+  // Remember which list the task was opened from, so "Back" returns there.
+  const currentView = $$(".view").find((v) => !v.hidden)?.id;
+  if (["browse", "matches", "mine"].includes(currentView)) state.returnView = currentView;
   panel.hidden = false;
   panel.replaceChildren();
+  panel.append(
+    el(
+      "button",
+      {
+        type: "button",
+        class: "secondary",
+        onclick: () => {
+          panel.hidden = true;
+          showView(state.returnView || "mine");
+        },
+      },
+      "← Back to list",
+    ),
+  );
 
   appendAll(
     panel,
