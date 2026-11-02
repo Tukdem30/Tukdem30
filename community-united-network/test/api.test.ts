@@ -23,6 +23,8 @@ vi.mock("../src/payments.js", () => ({
   createFundingCheckout: vi.fn(async () => ({ url: "https://checkout.example/test" })),
   paidCheckout: vi.fn(async () => stripeState.paid),
   startPayoutOnboarding: vi.fn(async () => ({ url: "https://onboard.example/test", accountId: "acct_test" })),
+  // In tests the raw body is the event itself; real signature checks run in Stripe's SDK.
+  verifyWebhook: vi.fn((raw: Buffer) => JSON.parse(raw.toString())),
 }));
 const adultDob = "1990-05-17";
 let uniq = 0;
@@ -669,5 +671,42 @@ describe("chat", () => {
     expect(report.status).toBe(201);
     const queue = await admin.agent.get("/api/admin/reports");
     expect(queue.body.reports[0].reason).toBe("Harassing message");
+  });
+});
+
+describe("stripe webhook", () => {
+  it("records a paid checkout even if the browser never returns, and ignores repeat deliveries", async () => {
+    const requester = await newUser("need_help", "wh-req");
+    const posted = await requester.agent.post("/api/tasks").send({
+      title: "Replace vent fan",
+      description: "Fan needs a new belt",
+      category: "repair",
+      city: "Colorado Springs",
+      zip: "80903",
+      schedule_type: "tomorrow",
+      helpers: "one",
+      price_cents: 2500,
+    });
+    const taskId = posted.body.id as string;
+    stripeState.paid = { taskId, requesterId: requester.id, amountCents: 2500, paymentIntentId: "pi_wh", chargeId: "ch_wh" };
+    const event = {
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_wh", mode: "payment", payment_status: "paid", metadata: { task_id: taskId } } },
+    };
+    const send = () => request(app).post("/api/stripe/webhook").set("Content-Type", "application/json").set("stripe-signature", "t=1,v1=x").send(JSON.stringify(event));
+
+    expect((await send()).status).toBe(200);
+    expect((await ledger(taskId)).held).toBe(2500);
+
+    expect((await send()).status).toBe(200);
+    expect((await ledger(taskId)).held).toBe(2500);
+  });
+
+  it("rejects requests whose signature does not check out", async () => {
+    vi.mocked(payments.verifyWebhook).mockImplementationOnce(() => {
+      throw new Error("bad signature");
+    });
+    const res = await request(app).post("/api/stripe/webhook").set("Content-Type", "application/json").send("{}");
+    expect(res.status).toBe(400);
   });
 });

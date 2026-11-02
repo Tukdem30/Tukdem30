@@ -147,3 +147,10 @@ export async function paidCheckout(sessionId: string): Promise<{
     chargeId,
   };
 }
+
+/** Checks that a webhook really came from Stripe. Throws if the signature is wrong. */
+export function verifyWebhook(rawBody: Buffer, signature: string): Stripe.Event {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) throw new HttpError(503, "Webhook is not configured");
+  return stripe().webhooks.constructEvent(rawBody, signature, secret);
+}

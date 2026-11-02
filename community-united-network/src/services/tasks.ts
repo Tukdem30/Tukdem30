@@ -1039,16 +1039,17 @@ export async function startFunding(user: AuthUser, id: string, origin: string) {
   });
 }
 
-/** Records a completed Stripe payment against the task. Safe to call more than once. */
-export async function confirmFunding(user: AuthUser, id: string, sessionId: string) {
-  if (!sessionId || sessionId.length > 255) throw new HttpError(400, "Missing payment reference");
+/**
+ * Applies a paid Checkout session to its task. Safe to run more than once: a repeat is ignored,
+ * a second payment for the same task is refunded, and a payment that no longer matches the task price is refunded.
+ */
+async function applyPaidSession(sessionId: string, requesterId: string | null, taskId: string | null) {
   const paid = await paidCheckout(sessionId);
+  if (taskId && paid.taskId !== taskId) throw new HttpError(400, "This payment is for a different task");
+  if (requesterId && paid.requesterId !== requesterId) throw new HttpError(403, "Only the requester can confirm payment");
   return withTx(async (c) => {
-    const t = await lockTask(c, id);
-    if (t.requester_id !== user.id) throw new HttpError(403, "Only the requester can confirm payment");
-    if (paid.taskId !== id || paid.requesterId !== user.id) {
-      throw new HttpError(400, "This payment is for a different task");
-    }
+    const t = await lockTask(c, paid.taskId);
+    if (paid.requesterId !== t.requester_id) throw new HttpError(400, "This payment does not match the task requester");
 
     if (t.funded) {
       if (t.stripe_payment_intent_id !== paid.paymentIntentId) {
@@ -1056,7 +1057,7 @@ export async function confirmFunding(user: AuthUser, id: string, sessionId: stri
         await refundToRequester({
           paymentIntentId: paid.paymentIntentId,
           amountCents: paid.amountCents,
-          taskId: id,
+          taskId: t.id,
           idempotencyKey: `duplicate-refund:${paid.paymentIntentId}`,
         });
       }
@@ -1065,22 +1066,33 @@ export async function confirmFunding(user: AuthUser, id: string, sessionId: stri
 
     const expected = t.price_cents * t.helpers_needed;
     if (paid.amountCents !== expected) {
-      // The task changed after payment started. Return the money and ask for a new payment.
+      // The task changed after payment started. Return the money so the requester can pay again.
       await refundToRequester({
         paymentIntentId: paid.paymentIntentId,
         amountCents: paid.amountCents,
-        taskId: id,
+        taskId: t.id,
         idempotencyKey: `mismatch-refund:${paid.paymentIntentId}`,
       });
       throw new HttpError(409, "The task changed after payment started. Your payment was refunded; please pay again.");
     }
 
-    await addEvent(c, id, "hold", expected);
+    await addEvent(c, t.id, "hold", expected);
     await c.query(
       `UPDATE tasks SET funded = true, stripe_payment_intent_id = $2, stripe_charge_id = $3, updated_at = now()
         WHERE id = $1`,
-      [id, paid.paymentIntentId, paid.chargeId],
+      [t.id, paid.paymentIntentId, paid.chargeId],
     );
     return { status: t.status, funded: true };
   });
+}
+
+/** Browser return from Stripe Checkout. Only the requester who started the payment can use it. */
+export async function confirmFunding(user: AuthUser, id: string, sessionId: string) {
+  if (!sessionId || sessionId.length > 255) throw new HttpError(400, "Missing payment reference");
+  return applyPaidSession(sessionId, user.id, id);
+}
+
+/** Stripe webhook: records a payment even if the browser never returned to the site. */
+export async function recordFundingFromWebhook(sessionId: string) {
+  return applyPaidSession(sessionId, null, null);
 }

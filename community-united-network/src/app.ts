@@ -9,6 +9,7 @@ import { errorHandler, HttpError } from "./errors.js";
 import { authRouter } from "./routes/auth.js";
 import { profileRouter, foundersRouter, membersRouter, languagesRouter } from "./routes/profile.js";
 import { chatRouter } from "./routes/chat.js";
+import { stripeWebhookRouter } from "./routes/webhooks.js";
 import { taskRouter } from "./routes/tasks.js";
 import { adminRouter } from "./routes/admin.js";
 
@@ -36,6 +37,8 @@ export function createApp() {
       },
     }),
   );
+  // Stripe webhook goes before the JSON parser so its raw body is kept for signature checks.
+  app.use("/api/stripe/webhook", stripeWebhookRouter);
   app.use(express.json({ limit: "64kb" }));
   app.use(express.static(publicDir));
 
