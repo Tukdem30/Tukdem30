@@ -64,12 +64,12 @@ async function run(action, successMessage) {
   }
 }
 
-const PAGES = ["browse", "matches", "mine", "post", "profile", "members", "messages", "admin"];
+const PAGES = ["home", "browse", "matches", "mine", "post", "profile", "members", "messages", "admin"];
 const nav = { current: null, trail: [], popping: false };
 
 /** Opens a tab as its own page. The address changes too, so the phone's back gesture works. */
 function showView(name) {
-  if (!PAGES.includes(name)) name = "browse";
+  if (!PAGES.includes(name)) name = "home";
   if (location.hash !== "#" + name) {
     location.hash = name; // the hashchange listener below draws the page
   } else {
@@ -78,7 +78,7 @@ function showView(name) {
 }
 
 function renderView(name) {
-  if (!PAGES.includes(name)) name = "browse";
+  if (!PAGES.includes(name)) name = "home";
   if (!nav.popping && nav.current && nav.current !== name) {
     nav.trail.push(nav.current);
     if (nav.trail.length > 20) nav.trail.shift();
@@ -99,7 +99,7 @@ function renderView(name) {
 
 /** Back button on every tab page: returns to the page you came from. */
 function goBack() {
-  const prev = nav.trail.pop() || "browse";
+  const prev = nav.trail.pop() || "home";
   nav.popping = true;
   if (location.hash !== "#" + prev) location.hash = prev;
   else renderView(prev);
@@ -107,7 +107,7 @@ function goBack() {
 
 window.addEventListener("hashchange", () => {
   if (!state.me) return;
-  renderView(location.hash.slice(1) || "browse");
+  renderView(location.hash.slice(1) || "home");
 });
 
 $$("[data-back]").forEach((b) => b.addEventListener("click", goBack));
@@ -161,7 +161,7 @@ async function boot() {
     setLoggedIn(true);
     $("#admin-nav").hidden = !state.me.is_admin;
     const start = location.hash.slice(1);
-    showView(PAGES.includes(start) ? start : "browse");
+    showView(PAGES.includes(start) ? start : "home");
     await handleReturns();
   } catch {
     state.me = null;
@@ -202,7 +202,7 @@ $("#logout").addEventListener("click", async () => {
   notify("You have logged out.", "ok");
 });
 
-$$("nav button[data-view]").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+$$("button[data-view]").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
 
 // ---------- browse / matches ----------
 

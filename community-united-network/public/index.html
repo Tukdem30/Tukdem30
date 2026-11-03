@@ -19,6 +19,7 @@
     <h1>Community United Network</h1>
     <p class="tagline">Everyone needs help sometimes. Everyone has something to offer.</p>
     <nav id="nav" hidden>
+      <button data-view="home">Home</button>
       <button data-view="browse">Browse tasks</button>
       <button data-view="matches">Matched for me</button>
       <button data-view="mine">My tasks</button>
@@ -60,6 +61,20 @@
         <button type="submit">Create account</button>
       </form>
       <p><button id="toggle-auth" class="link" type="button">I already have an account</button></p>
+    </section>
+
+    <section id="home" class="view" hidden>
+      <h2>Welcome to Community United Network</h2>
+      <p class="hint">Everyone needs help sometimes. Everyone has something to offer.</p>
+      <div class="home-grid">
+        <button type="button" class="home-tile" data-view="browse">Browse tasks</button>
+        <button type="button" class="home-tile" data-view="matches">Matched for me</button>
+        <button type="button" class="home-tile" data-view="post">Post a task</button>
+        <button type="button" class="home-tile" data-view="mine">My tasks</button>
+        <button type="button" class="home-tile" data-view="members">Community</button>
+        <button type="button" class="home-tile" data-view="messages">Messages</button>
+        <button type="button" class="home-tile" data-view="profile">My profile</button>
+      </div>
     </section>
 
     <section id="browse" class="view" hidden>
