@@ -86,6 +86,8 @@ function renderView(name) {
   nav.popping = false;
   nav.current = name;
   $$(".view").forEach((v) => (v.hidden = v.id !== name));
+  // Tab pages are full pages: the top menu hides, and Back returns to Home. Home keeps the menu.
+  if (state.me) $("#nav").hidden = name !== "home";
   window.scrollTo({ top: 0 });
   if (name === "browse") loadBrowse();
   if (name === "matches") loadMatches();

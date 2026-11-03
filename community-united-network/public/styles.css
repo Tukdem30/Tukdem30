@@ -95,3 +95,5 @@ footer.site-footer a { color: #e9b8ff; }
 .welcome { max-width: 42rem; line-height: 1.7; }
 .welcome h3 { margin-top: 1.5rem; }
 .tagline-lg { font-size: 1.1rem; color: var(--muted); }
+
+[hidden] { display: none !important; }
