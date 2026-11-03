@@ -316,7 +316,7 @@ function publicTask(t: TaskRow): Record<string, unknown> {
 
 export async function listOpenTasks(query: unknown) {
   const q = listSchema.parse(query);
-  const where: string[] = ["t.status = 'open'"];
+  const where: string[] = ["t.status = 'open'", "(t.help_type = 'volunteer' OR t.funded = true)"];
   const params: unknown[] = [];
   const add = (sql: string, value: unknown) => {
     params.push(value);
@@ -368,6 +368,10 @@ export async function getTaskForViewer(user: AuthUser | undefined, id: string) {
   const isParty = isRequester || assigned || isAdmin;
 
   if (!isParty && t.status !== "open") throw new HttpError(404, "Task not found");
+  if (!isRequester && !isAdmin && user?.verification_status !== "verified") {
+    throw new HttpError(403, "Verify your identity to view tasks");
+  }
+  if (!isParty && t.help_type === "paid" && !t.funded) throw new HttpError(404, "Task not found");
 
   const { rows: assignRows } = await pool.query(
     `SELECT a.helper_id, a.status, a.arrived_at, u.display_name

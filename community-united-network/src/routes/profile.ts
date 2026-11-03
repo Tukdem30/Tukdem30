@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { requireUser } from "../auth.js";
+import { requireUser, requireVerified } from "../auth.js";
 import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { rankHelpers } from "../matching.js";
@@ -49,7 +49,7 @@ profileRouter.put("/", requireUser, async (req, res) => {
 });
 
 /** Open tasks ranked for the signed-in person. Every eligible task is returned; ranking only orders them. */
-profileRouter.get("/matches", requireUser, async (req, res) => {
+profileRouter.get("/matches", requireUser, requireVerified, async (req, res) => {
   const { rows: meRows } = await pool.query(
     `SELECT id, role_mode, zip, city, skills, tools, verification_status FROM users WHERE id = $1`,
     [req.user!.id],
@@ -153,7 +153,7 @@ export const membersRouter = Router();
 const MEMBER_COLUMNS = `id, display_name, role_mode, city, state, bio, skills, tools,
   verification_status, founder_title`;
 
-membersRouter.get("/", async (_req, res) => {
+membersRouter.get("/", requireUser, requireVerified, async (_req, res) => {
   const { rows } = await pool.query(
     `SELECT ${MEMBER_COLUMNS} FROM users
       WHERE profile_public = true AND verification_status <> 'rejected'
@@ -162,7 +162,7 @@ membersRouter.get("/", async (_req, res) => {
   res.json({ members: rows.map(toPublicMember) });
 });
 
-membersRouter.get("/:id", async (req, res) => {
+membersRouter.get("/:id", requireUser, requireVerified, async (req, res) => {
   const id = String(req.params.id);
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(404, "Member not found");
   const { rows } = await pool.query(

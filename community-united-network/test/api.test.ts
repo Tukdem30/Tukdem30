@@ -578,7 +578,11 @@ describe("community directory", () => {
     await shown.agent.put("/api/me").send({ display_name: "Shown Member", city: "Colorado Springs", zip: "80903", profile_public: true, skills: ["Repair"] });
     await hidden.agent.put("/api/me").send({ display_name: "Hidden Member", zip: "80903" });
 
-    const list = await request(app).get("/api/members");
+    const admin = await newUser("both", "dir-admin");
+    await makeAdmin(admin.id);
+    const viewer = await newUser("both", "dir-viewer");
+    await verify(admin.agent, viewer.id);
+    const list = await viewer.agent.get("/api/members");
     expect(list.status).toBe(200);
     const ids = list.body.members.map((m: { id: string }) => m.id);
     expect(ids).toContain(shown.id);
@@ -589,8 +593,8 @@ describe("community directory", () => {
     expect(member).not.toHaveProperty("zip");
     expect(member).not.toHaveProperty("date_of_birth");
 
-    expect((await request(app).get(`/api/members/${hidden.id}`)).status).toBe(404);
-    expect((await request(app).get(`/api/members/${shown.id}`)).status).toBe(200);
+    expect((await viewer.agent.get(`/api/members/${hidden.id}`)).status).toBe(404);
+    expect((await viewer.agent.get(`/api/members/${shown.id}`)).status).toBe(200);
   });
 });
 
@@ -728,5 +732,44 @@ describe("categories", () => {
       help_type: "volunteer",
     });
     expect(bad.status).toBe(400);
+  });
+});
+
+describe("verification gates", () => {
+  const postTask = (agent: request.Agent, overrides: Record<string, unknown> = {}) =>
+    agent.post("/api/tasks").send({
+      title: "Replace vent fan",
+      description: "Fan needs a new belt",
+      category: "home-repair",
+      city: "Colorado Springs",
+      zip: "80903",
+      schedule_type: "tomorrow",
+      helpers: "one",
+      price_cents: 2500,
+      ...overrides,
+    });
+
+  it("does not let unverified people browse tasks or open task details", async () => {
+    const unverified = await newUser("both", "gate-unverified");
+    const requester = await newUser("need_help", "gate-requester");
+    const posted = await postTask(requester.agent);
+    expect((await unverified.agent.get("/api/tasks")).status).toBe(403);
+    expect((await unverified.agent.get(`/api/tasks/${posted.body.id}`)).status).toBe(403);
+    // The requester can still see their own task before they are verified.
+    expect((await requester.agent.get(`/api/tasks/${posted.body.id}`)).status).toBe(200);
+  });
+
+  it("does not show unpaid paid tasks in browse", async () => {
+    const admin = await newUser("both", "gate-admin");
+    await makeAdmin(admin.id);
+    const viewer = await newUser("both", "gate-viewer");
+    await verify(admin.agent, viewer.id);
+    const requester = await newUser("need_help", "gate-req2");
+    const unpaid = await postTask(requester.agent, { title: "Unpaid task here" });
+    const list = await viewer.agent.get("/api/tasks");
+    expect(list.body.tasks.map((t: { id: string }) => t.id)).not.toContain(unpaid.body.id);
+    await fund(unpaid.body.id);
+    const after = await viewer.agent.get("/api/tasks");
+    expect(after.body.tasks.map((t: { id: string }) => t.id)).toContain(unpaid.body.id);
   });
 });

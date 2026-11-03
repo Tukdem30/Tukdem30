@@ -6,7 +6,7 @@ import { CATEGORIES } from "../categories.js";
 
 export const taskRouter = Router();
 
-taskRouter.get("/", async (req, res) => {
+taskRouter.get("/", requireUser, requireVerified, async (req, res) => {
   res.json(await tasks.listOpenTasks(req.query));
 });
 
@@ -22,7 +22,7 @@ taskRouter.get("/categories", (_req, res) => {
   res.json({ categories: CATEGORIES });
 });
 
-taskRouter.get("/:id", async (req, res) => {
+taskRouter.get("/:id", requireUser, async (req, res) => {
   res.json(await tasks.getTaskForViewer(req.user, req.params.id as string));
 });
 
