@@ -1,5 +1,5 @@
 // Caches the app shell so it opens offline and installs cleanly. API responses are never cached.
-const CACHE = "cun-shell-v1";
+const CACHE = "cun-shell-v2";
 const SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.webmanifest", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
