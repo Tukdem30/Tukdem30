@@ -9,7 +9,7 @@ services:
     # Dev dependencies (TypeScript) are needed to build, so include them.
     buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
-    healthCheckPath: /api/tasks
+    healthCheckPath: /api/languages
     envVars:
       - key: NODE_ENV
         value: production
