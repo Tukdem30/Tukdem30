@@ -64,8 +64,29 @@ async function run(action, successMessage) {
   }
 }
 
+const PAGES = ["browse", "matches", "mine", "post", "profile", "members", "messages", "admin"];
+const nav = { current: null, trail: [], popping: false };
+
+/** Opens a tab as its own page. The address changes too, so the phone's back gesture works. */
 function showView(name) {
+  if (!PAGES.includes(name)) name = "browse";
+  if (location.hash !== "#" + name) {
+    location.hash = name; // the hashchange listener below draws the page
+  } else {
+    renderView(name);
+  }
+}
+
+function renderView(name) {
+  if (!PAGES.includes(name)) name = "browse";
+  if (!nav.popping && nav.current && nav.current !== name) {
+    nav.trail.push(nav.current);
+    if (nav.trail.length > 20) nav.trail.shift();
+  }
+  nav.popping = false;
+  nav.current = name;
   $$(".view").forEach((v) => (v.hidden = v.id !== name));
+  window.scrollTo({ top: 0 });
   if (name === "browse") loadBrowse();
   if (name === "matches") loadMatches();
   if (name === "mine") loadMine();
@@ -75,6 +96,21 @@ function showView(name) {
   if (name === "messages") loadConversations();
   if (name === "post") $("#post-form").scrollIntoView({ block: "start" });
 }
+
+/** Back button on every tab page: returns to the page you came from. */
+function goBack() {
+  const prev = nav.trail.pop() || "browse";
+  nav.popping = true;
+  if (location.hash !== "#" + prev) location.hash = prev;
+  else renderView(prev);
+}
+
+window.addEventListener("hashchange", () => {
+  if (!state.me) return;
+  renderView(location.hash.slice(1) || "browse");
+});
+
+$$("[data-back]").forEach((b) => b.addEventListener("click", goBack));
 
 function setLoggedIn(on) {
   $("#nav").hidden = !on;
@@ -106,7 +142,8 @@ async function boot() {
     state.me = await api("/api/me");
     setLoggedIn(true);
     $("#admin-nav").hidden = !state.me.is_admin;
-    showView("browse");
+    const start = location.hash.slice(1);
+    showView(PAGES.includes(start) ? start : "browse");
     await handleReturns();
   } catch {
     state.me = null;
