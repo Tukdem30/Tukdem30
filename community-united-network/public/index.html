@@ -66,6 +66,7 @@
       <button type="button" class="secondary back-btn" data-back>← Back</button>
       <h2>Open tasks</h2>
       <form id="filter-form" class="inline">
+        <label>Category <select name="category" class="category-select"></select></label>
         <label>ZIP <input name="zip" inputmode="numeric" maxlength="5" /></label>
         <label>Keyword <input name="q" maxlength="100" /></label>
         <label>Type
@@ -100,7 +101,7 @@
       <form id="post-form">
         <label>Title <input name="title" required minlength="3" maxlength="120" /></label>
         <label>Description <textarea name="description" required minlength="10" maxlength="4000" rows="4"></textarea></label>
-        <label>Category <input name="category" required maxlength="60" placeholder="e.g. repair, yard work, tutoring" /></label>
+        <label>Category <select name="category" class="category-select" required></select></label>
         <label>Skills needed (comma separated) <input name="required_skills" maxlength="400" /></label>
         <label>Tools needed (comma separated) <input name="tools_needed" maxlength="400" /></label>
         <label>City <input name="city" required maxlength="80" /></label>

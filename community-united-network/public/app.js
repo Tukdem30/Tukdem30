@@ -121,6 +121,23 @@ function setLoggedIn(on) {
 
 // ---------- auth ----------
 
+/** Fills the category dropdowns on the browse filter and the post form. */
+async function loadCategories() {
+  try {
+    const { categories } = await api("/api/tasks/categories");
+    const filter = $("#filter-form").elements.namedItem("category");
+    const post = $("#post-form").elements.namedItem("category");
+    filter.replaceChildren(new Option("All categories", ""));
+    post.replaceChildren(new Option("Choose a category", "", true, true));
+    for (const c of categories) {
+      filter.append(new Option(c.label, c.value));
+      post.append(new Option(c.label, c.value));
+    }
+  } catch {
+    // The page still works without categories; the server will explain when a task is saved.
+  }
+}
+
 async function loadFounders() {
   try {
     const data = await api("/api/founders");
@@ -138,6 +155,7 @@ async function loadFounders() {
 
 async function boot() {
   loadFounders();
+  loadCategories();
   try {
     state.me = await api("/api/me");
     setLoggedIn(true);

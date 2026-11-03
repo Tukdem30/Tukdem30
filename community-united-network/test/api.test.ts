@@ -75,7 +75,7 @@ async function newTask(agent: request.Agent, overrides: Record<string, unknown> 
   const res = await agent.post("/api/tasks").send({
     title: "Fix kitchen exhaust fan",
     description: "Fan rattles and needs a belt replaced. Ladder required.",
-    category: "repair",
+    category: "home-repair",
     help_type: "paid",
     required_skills: ["Appliance Repair"],
     tools_needed: ["ladder"],
@@ -483,7 +483,7 @@ describe("payments", () => {
     const posted = await requester.agent.post("/api/tasks").send({
       title: "Replace vent fan",
       description: "Fan needs a new belt",
-      category: "repair",
+      category: "home-repair",
       city: "Colorado Springs",
       zip: "80903",
       schedule_type: "tomorrow",
@@ -501,7 +501,7 @@ describe("payments", () => {
     const posted = await requester.agent.post("/api/tasks").send({
       title: "Replace vent fan",
       description: "Fan needs a new belt",
-      category: "repair",
+      category: "home-repair",
       city: "Colorado Springs",
       zip: "80903",
       schedule_type: "tomorrow",
@@ -529,7 +529,7 @@ describe("payments", () => {
     const posted = await requester.agent.post("/api/tasks").send({
       title: "Replace vent fan",
       description: "Fan needs a new belt",
-      category: "repair",
+      category: "home-repair",
       city: "Colorado Springs",
       zip: "80903",
       schedule_type: "tomorrow",
@@ -680,7 +680,7 @@ describe("stripe webhook", () => {
     const posted = await requester.agent.post("/api/tasks").send({
       title: "Replace vent fan",
       description: "Fan needs a new belt",
-      category: "repair",
+      category: "home-repair",
       city: "Colorado Springs",
       zip: "80903",
       schedule_type: "tomorrow",
@@ -708,5 +708,25 @@ describe("stripe webhook", () => {
     });
     const res = await request(app).post("/api/stripe/webhook").set("Content-Type", "application/json").send("{}");
     expect(res.status).toBe(400);
+  });
+});
+
+describe("categories", () => {
+  it("lists the categories and rejects an unknown one", async () => {
+    const list = await request(app).get("/api/tasks/categories");
+    expect(list.body.categories.map((c: { value: string }) => c.value)).toContain("electronics");
+    const requester = await newUser("need_help", "cat-req");
+    const bad = await requester.agent.post("/api/tasks").send({
+      title: "Something odd",
+      description: "A task with a category that does not exist",
+      category: "made-up",
+      city: "Colorado Springs",
+      zip: "80903",
+      schedule_type: "tomorrow",
+      helpers: "one",
+      price_cents: 0,
+      help_type: "volunteer",
+    });
+    expect(bad.status).toBe(400);
   });
 });

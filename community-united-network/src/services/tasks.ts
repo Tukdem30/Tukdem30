@@ -17,6 +17,7 @@ import { HttpError } from "../errors.js";
 import { rankHelpers } from "../matching.js";
 import { createFundingCheckout, paidCheckout, payoutsReady, refundToRequester, transferToHelper } from "../payments.js";
 import { tagList, UUID_RE, zip } from "../validation.js";
+import { CATEGORY_VALUES } from "../categories.js";
 
 type Client = pg.PoolClient;
 
@@ -76,7 +77,7 @@ export const taskInputSchema = z
   .object({
     title: z.string().trim().min(3).max(120),
     description: z.string().trim().min(10).max(4000),
-    category: z.string().trim().min(2).max(60),
+    category: z.enum(CATEGORY_VALUES),
     help_type: z.enum(["paid", "volunteer"]).default("paid"),
     required_skills: tagList.default([]),
     tools_needed: tagList.default([]),
@@ -164,7 +165,7 @@ export const reviewSchema = z.object({
 export const listSchema = z.object({
   zip: zip.optional(),
   city: z.string().trim().max(80).optional(),
-  category: z.string().trim().max(60).optional(),
+  category: z.enum(CATEGORY_VALUES).optional(),
   help_type: z.enum(["paid", "volunteer"]).optional(),
   skill: z.string().trim().max(40).optional(),
   q: z.string().trim().max(100).optional(),

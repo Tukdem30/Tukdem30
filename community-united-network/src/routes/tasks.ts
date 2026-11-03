@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireUser, requireVerified } from "../auth.js";
 import * as tasks from "../services/tasks.js";
 import { siteOrigin } from "../origin.js";
+import { CATEGORIES } from "../categories.js";
 
 export const taskRouter = Router();
 
@@ -15,6 +16,10 @@ taskRouter.post("/", requireUser, async (req, res) => {
 
 taskRouter.get("/mine", requireUser, async (req, res) => {
   res.json(await tasks.listMyTasks(req.user!));
+});
+
+taskRouter.get("/categories", (_req, res) => {
+  res.json({ categories: CATEGORIES });
 });
 
 taskRouter.get("/:id", async (req, res) => {
