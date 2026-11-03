@@ -9,15 +9,15 @@ import {
 } from "../src/domain.js";
 
 describe("fees", () => {
-  it("takes 10% and pays the rest to the helper, matching the spec example", () => {
-    expect(platformFee(2500)).toBe(250);
-    expect(splitPayout(2500)).toEqual({ fee: 250, net: 2250 });
+  it("takes 15% and pays the rest to the helper", () => {
+    expect(platformFee(2500)).toBe(375);
+    expect(splitPayout(2500)).toEqual({ fee: 375, net: 2125 });
   });
 
   it("rounds to the nearest cent without losing money", () => {
     const { fee, net } = splitPayout(1005);
     expect(fee + net).toBe(1005);
-    expect(fee).toBe(101);
+    expect(fee).toBe(151);
   });
 });
 

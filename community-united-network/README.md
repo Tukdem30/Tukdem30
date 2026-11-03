@@ -16,7 +16,7 @@ first working version (MVP) of the concept.
 - **Task lifecycle:** open, accepted, in progress, awaiting confirmation, completed, partially completed,
   continue later, paused for safety, disputed, cancelled.
 - **Payments (test mode):** the requester's full amount is held when the task is posted. Money moves only
-  when the requester confirms. The helper receives the rate minus a 10% platform fee. Every movement is
+  when the requester confirms. The helper receives the rate minus a 15% platform fee. Every movement is
   recorded in an append-only ledger.
 - **Cancellation compensation:** more than 24 hours' notice pays nothing. 4–24 hours pays 25%. Under 4 hours
   pays 50%. Once the helper has arrived, pay is in full. A genuine emergency waives compensation.
@@ -33,7 +33,7 @@ first working version (MVP) of the concept.
 
 - Requesters pay through Stripe Checkout. The task stays unpublished until payment is confirmed.
 - Helpers set up a Stripe Express payout account from their profile. Paid tasks need a ready account.
-- When a task is confirmed, each helper's share is transferred to their Stripe account. The 10% fee stays with the platform.
+- When a task is confirmed, each helper's share is transferred to their Stripe account. The 15% fee stays with the platform.
 - Unused funds are refunded to the requester's card.
 - Set `STRIPE_SECRET_KEY` (a test key starting `sk_test_`) in the environment. Without it, payment features show "not set up yet."
 

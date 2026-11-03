@@ -181,7 +181,7 @@ describe("accounts", () => {
 });
 
 describe("paid task, happy path", () => {
-  it("holds funds, pays the helper minus 10%, and keeps the ledger balanced", async () => {
+  it("holds funds, pays the helper minus 15%, and keeps the ledger balanced", async () => {
     const requester = await newUser("need_help", "rita");
     const helper = await newUser("can_help", "hank");
     const admin = await newUser("both", "admin");
@@ -215,7 +215,7 @@ describe("paid task, happy path", () => {
     expect(confirm.body.status).toBe("completed");
 
     const books = await ledger(task.id);
-    expect(books).toMatchObject({ released: 2250, fee: 250, refund: 0, held: 0 });
+    expect(books).toMatchObject({ released: 2125, fee: 375, refund: 0, held: 0 });
   });
 
   it("does not let the helper confirm their own work", async () => {
@@ -266,7 +266,7 @@ describe("cancellation", () => {
 
     const res = await requester.agent.post(`/api/tasks/${task.id}/cancel`).send({});
     expect(res.body).toMatchObject({ status: "cancelled", compensation_cents: 2000, refunded_cents: 2000 });
-    expect(await ledger(task.id)).toMatchObject({ released: 1800, fee: 200, refund: 2000, held: 0 });
+    expect(await ledger(task.id)).toMatchObject({ released: 1700, fee: 300, refund: 2000, held: 0 });
   });
 
   it("waives compensation for an emergency exception", async () => {
@@ -324,7 +324,7 @@ describe("change requests and partial completion", () => {
     await helper.agent.post(`/api/tasks/${task.id}/finish`).send({ outcome: "partially_completed", earned_cents: 2000 });
     await requester.agent.post(`/api/tasks/${task.id}/confirm`).send({});
 
-    expect(await ledger(task.id)).toMatchObject({ released: 1800, fee: 200, refund: 3000, held: 0 });
+    expect(await ledger(task.id)).toMatchObject({ released: 1700, fee: 300, refund: 3000, held: 0 });
   });
 
   it("requires a partial amount strictly between zero and the full rate", async () => {
@@ -352,13 +352,13 @@ describe("change requests and partial completion", () => {
     await helper.agent.post(`/api/tasks/${task.id}/finish`).send({ outcome: "continue_later", earned_cents: 1000 });
     const confirm = await requester.agent.post(`/api/tasks/${task.id}/confirm`).send({});
     expect(confirm.body.status).toBe("continue_later");
-    expect(await ledger(task.id)).toMatchObject({ released: 900, fee: 100, held: 3000 });
+    expect(await ledger(task.id)).toMatchObject({ released: 850, fee: 150, held: 3000 });
 
     // Resume and finish: the helper is paid the rest.
     await helper.agent.post(`/api/tasks/${task.id}/start`).send({});
     await helper.agent.post(`/api/tasks/${task.id}/finish`).send({ outcome: "completed" });
     await requester.agent.post(`/api/tasks/${task.id}/confirm`).send({});
-    expect(await ledger(task.id)).toMatchObject({ released: 3600, fee: 400, held: 0 });
+    expect(await ledger(task.id)).toMatchObject({ released: 3400, fee: 600, held: 0 });
   });
 });
 
@@ -566,7 +566,7 @@ describe("payments", () => {
 
     const transfer = vi.mocked(payments.transferToHelper);
     expect(transfer).toHaveBeenCalledTimes(1);
-    expect(transfer.mock.calls[0][0]).toMatchObject({ accountId: "acct_test", amountCents: 2250, chargeId: "ch_test" });
+    expect(transfer.mock.calls[0][0]).toMatchObject({ accountId: "acct_test", amountCents: 2125, chargeId: "ch_test" });
     expect(vi.mocked(payments.refundToRequester)).not.toHaveBeenCalled();
   });
 });

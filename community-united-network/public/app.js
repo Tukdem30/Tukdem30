@@ -323,7 +323,7 @@ async function openDetail(id) {
       { class: "meta" },
       task.help_type === "volunteer"
         ? "Volunteer task"
-        : `Paid: ${money(task.price_cents)} per helper · helper receives ${money(task.helper_net_cents)} after the 10% platform fee`,
+        : `Paid: ${money(task.price_cents)} per helper · helper receives ${money(task.helper_net_cents)} after the 15% platform fee`,
     ),
     el("div", { class: "meta" }, `Helpers: ${task.active_helpers} of ${task.helpers_needed} · Open slots: ${task.open_slots}`),
     task.supplies_note ? el("div", { class: "meta" }, `Supplies: ${task.supplies_note}`) : null,
