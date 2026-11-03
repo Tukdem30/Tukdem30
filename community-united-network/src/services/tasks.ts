@@ -1101,3 +1101,9 @@ export async function confirmFunding(user: AuthUser, id: string, sessionId: stri
 export async function recordFundingFromWebhook(sessionId: string) {
   return applyPaidSession(sessionId, null, null);
 }
+
+/** Stripe reported an identity result. A passed check verifies the member; an unclear one goes to the admin queue. */
+export async function recordIdentityResult(userId: string, status: "verified" | "pending"): Promise<void> {
+  if (!UUID_RE.test(userId)) return;
+  await pool.query("UPDATE users SET verification_status = $2 WHERE id = $1", [userId, status]);
+}

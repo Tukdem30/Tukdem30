@@ -154,3 +154,15 @@ export function verifyWebhook(rawBody: Buffer, signature: string): Stripe.Event 
   if (!secret) throw new HttpError(503, "Webhook is not configured");
   return stripe().webhooks.constructEvent(rawBody, signature, secret);
 }
+
+/** Starts Stripe's hosted identity check (government ID plus selfie). Stripe collects the images, not this app. */
+export async function startIdentityVerification(args: { userId: string; returnUrl: string }): Promise<{ url: string }> {
+  const session = await stripe().identity.verificationSessions.create({
+    type: "document",
+    metadata: { user_id: args.userId },
+    options: { document: { require_matching_selfie: true } },
+    return_url: args.returnUrl,
+  });
+  if (!session.url) throw new HttpError(502, "Stripe did not return a verification link");
+  return { url: session.url };
+}

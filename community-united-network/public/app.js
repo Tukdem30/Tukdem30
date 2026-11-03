@@ -576,7 +576,7 @@ async function loadProfile() {
     else field.value = v ?? "";
   }
   $("#profile-form").elements.namedItem("profile_public").checked = Boolean(p.profile_public);
-  $("#request-verify").hidden = !["unverified", "rejected"].includes(p.verification_status);
+  $("#request-verify").hidden = p.verification_status === "verified";
   loadPayouts();
   $("#verify-status").textContent =
     p.verification_status === "verified"
@@ -605,8 +605,8 @@ $("#profile-form").addEventListener("submit", async (e) => {
 });
 
 $("#request-verify").addEventListener("click", async () => {
-  const res = await run(() => api("/api/me/request-verification", { body: {} }), "Verification requested. An admin will review it.");
-  if (res) loadProfile();
+  const res = await run(() => api("/api/me/identity", { body: {} }));
+  if (res && res.url) window.location.href = res.url;
 });
 
 // ---------- admin ----------
@@ -771,6 +771,9 @@ async function handleReturns() {
     openDetail(taskId);
   } else if (params.get("funding_cancelled")) {
     notify("Payment was cancelled. The task is not open to helpers yet.", "error");
+    history.replaceState({}, "", "/");
+  } else if (params.get("identity")) {
+    notify("Thanks. Stripe is checking your identity. Verified members can accept tasks and message others.", "ok");
     history.replaceState({}, "", "/");
   } else if (params.get("payouts")) {
     notify("Payout setup saved. Your status is shown on your profile.", "ok");

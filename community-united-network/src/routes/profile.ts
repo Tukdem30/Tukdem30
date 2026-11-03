@@ -5,7 +5,7 @@ import { pool } from "../db.js";
 import { HttpError } from "../errors.js";
 import { rankHelpers } from "../matching.js";
 import { tagList, zip } from "../validation.js";
-import { payoutsReady, startPayoutOnboarding } from "../payments.js";
+import { payoutsReady, startIdentityVerification, startPayoutOnboarding } from "../payments.js";
 import { siteOrigin } from "../origin.js";
 import { isSupportedLanguage, LANGUAGES } from "../translate.js";
 
@@ -98,6 +98,21 @@ profileRouter.get("/matches", requireUser, requireVerified, async (req, res) => 
       reasons: match!.reasons,
     }));
   res.json({ matches: ranked });
+});
+
+/** Starts Stripe's identity check for the signed-in member. */
+profileRouter.post("/identity", requireUser, async (req, res) => {
+  const { rows } = await pool.query<{ verification_status: string }>(
+    "SELECT verification_status FROM users WHERE id = $1",
+    [req.user!.id],
+  );
+  if (rows[0]?.verification_status === "verified") throw new HttpError(409, "Your identity is already verified");
+  res.json(
+    await startIdentityVerification({
+      userId: req.user!.id,
+      returnUrl: `${siteOrigin(req)}/?identity=return`,
+    }),
+  );
 });
 
 /** A person asks for identity verification. Admins approve or reject from the admin queue. */

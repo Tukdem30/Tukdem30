@@ -2,7 +2,7 @@ import express, { Router } from "express";
 import type Stripe from "stripe";
 import { HttpError } from "../errors.js";
 import { verifyWebhook } from "../payments.js";
-import { recordFundingFromWebhook } from "../services/tasks.js";
+import { recordFundingFromWebhook, recordIdentityResult } from "../services/tasks.js";
 
 export const stripeWebhookRouter = Router();
 
@@ -23,6 +23,13 @@ stripeWebhookRouter.post("/", express.raw({ type: "*/*" }), async (req, res) => 
     if (session.mode === "payment" && session.payment_status === "paid" && session.metadata?.task_id) {
       // Errors here return 500, so Stripe retries the delivery later.
       await recordFundingFromWebhook(session.id);
+    }
+  }
+  if (event.type === "identity.verification_session.verified" || event.type === "identity.verification_session.requires_input") {
+    const check = event.data.object as Stripe.Identity.VerificationSession;
+    const userId = check.metadata?.user_id;
+    if (userId) {
+      await recordIdentityResult(userId, event.type.endsWith("verified") ? "verified" : "pending");
     }
   }
   res.json({ received: true });

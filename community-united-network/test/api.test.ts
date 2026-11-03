@@ -21,6 +21,7 @@ vi.mock("../src/payments.js", () => ({
   transferToHelper: vi.fn(async () => undefined),
   refundToRequester: vi.fn(async () => undefined),
   createFundingCheckout: vi.fn(async () => ({ url: "https://checkout.example/test" })),
+  startIdentityVerification: vi.fn(async () => ({ url: "https://identity.example/test" })),
   paidCheckout: vi.fn(async () => stripeState.paid),
   startPayoutOnboarding: vi.fn(async () => ({ url: "https://onboard.example/test", accountId: "acct_test" })),
   // In tests the raw body is the event itself; real signature checks run in Stripe's SDK.
@@ -771,5 +772,35 @@ describe("verification gates", () => {
     await fund(unpaid.body.id);
     const after = await viewer.agent.get("/api/tasks");
     expect(after.body.tasks.map((t: { id: string }) => t.id)).toContain(unpaid.body.id);
+  });
+});
+
+describe("identity verification", () => {
+  it("starts Stripe's check, and a passed check verifies the member", async () => {
+    const member = await newUser("both", "id-member");
+    const start = await member.agent.post("/api/me/identity").send({});
+    expect(start.body.url).toBe("https://identity.example/test");
+
+    const event = {
+      type: "identity.verification_session.verified",
+      data: { object: { id: "vs_1", metadata: { user_id: member.id } } },
+    };
+    const res = await request(app).post("/api/stripe/webhook").set("Content-Type", "application/json").set("stripe-signature", "t=1,v1=x").send(JSON.stringify(event));
+    expect(res.status).toBe(200);
+    expect((await member.agent.get("/api/me")).body.verification_status).toBe("verified");
+    expect((await member.agent.post("/api/me/identity").send({})).status).toBe(409);
+  });
+
+  it("sends an unclear identity check to the admin queue", async () => {
+    const admin = await newUser("both", "id-admin");
+    await makeAdmin(admin.id);
+    const member = await newUser("both", "id-unclear");
+    const event = {
+      type: "identity.verification_session.requires_input",
+      data: { object: { id: "vs_2", metadata: { user_id: member.id } } },
+    };
+    await request(app).post("/api/stripe/webhook").set("Content-Type", "application/json").set("stripe-signature", "t=1,v1=x").send(JSON.stringify(event));
+    const queue = await admin.agent.get("/api/admin/queue");
+    expect(queue.body.verification_requests.map((u: { id: string }) => u.id)).toContain(member.id);
   });
 });
