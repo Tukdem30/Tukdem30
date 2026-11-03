@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Community United Network</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#6a1fa8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="CUN" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+</head>
+<body>
+  <header>
+    <img class="logo" src="/logo.png" alt="Community United Network logo" width="64" height="64" />
+    <h1>Community United Network</h1>
+    <p class="tagline">Everyone needs help sometimes. Everyone has something to offer.</p>
+    <nav id="nav" hidden>
+      <button data-view="home">Home</button>
+      <button data-view="browse">Browse tasks</button>
+      <button data-view="matches">Matched for me</button>
+      <button data-view="mine">My tasks</button>
+      <button data-view="post">Post a task</button>
+      <button data-view="profile">My profile</button>
+      <button data-view="members">Community</button>
+      <button data-view="messages">Messages</button>
+      <button data-view="admin" id="admin-nav" hidden>Admin</button>
+      <button id="logout">Log out</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="founders" class="founders" hidden aria-labelledby="founders-title">
+      <h2 id="founders-title">Founders</h2>
+      <div id="founders-list" class="founder-list"></div>
+    </section>
+
+    <p id="notice" role="status" aria-live="polite"></p>
+
+    <section id="auth" class="view" hidden>
+      <h2 id="auth-title">Log in</h2>
+      <form id="login-form">
+        <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+        <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
+        <button type="submit">Log in</button>
+      </form>
+      <form id="register-form" hidden>
+        <label>Display name <input name="display_name" required minlength="2" maxlength="80" /></label>
+        <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+        <label>Password (10+ characters) <input name="password" type="password" required minlength="10" autocomplete="new-password" /></label>
+        <label>Date of birth <input name="date_of_birth" type="date" required /></label>
+        <fieldset>
+          <legend>I am looking to</legend>
+          <label><input type="radio" name="role_mode" value="need_help" /> Get help</label>
+          <label><input type="radio" name="role_mode" value="can_help" /> Give help</label>
+          <label><input type="radio" name="role_mode" value="both" checked /> Both</label>
+        </fieldset>
+        <button type="submit">Create account</button>
+      </form>
+      <p><button id="toggle-auth" class="link" type="button">I already have an account</button></p>
+    </section>
+
+    <section id="home" class="view welcome" hidden>
+      <h2>Community United Network</h2>
+      <p>People need help with everyday things all the time:</p>
+
+      <h3>Our Vision</h3>
+      <p>Community United Network is a community-centered platform designed to help people connect with one another to give, receive, learn, work, and grow.</p>
+      <p>Our goal is bigger than creating another marketplace or social-media platform. We want to help create a culture where asking for help is normal, helping others is valued, and everyone has something meaningful to contribute.</p>
+      <p>A person might need help today and help someone else tomorrow. Someone may contribute money, another person may contribute an hour of their time, someone else may donate supplies, and another may share a skill or connection.</p>
+      <p>The platform brings these possibilities together in one welcoming community.</p>
+
+    </section>
+
+    <section id="browse" class="view" hidden>
+      <button type="button" class="secondary back-btn" data-back>← Back</button>
+      <h2>Open tasks</h2>
+      <form id="filter-form" class="inline">
+        <label>Category <select name="category" class="category-select"></select></label>
+        <label>ZIP <input name="zip" inputmode="numeric" maxlength="5" /></label>
+        <label>Keyword <input name="q" maxlength="100" /></label>
+        <label>Type
+          <select name="help_type">
+            <option value="">Any</option>
+            <option value="paid">Paid</option>
+            <option value="volunteer">Volunteer</option>
+          </select>
+        </label>
+        <button type="submit">Search</button>
+      </form>
+      <div id="browse-list" class="cards"></div>
+    </section>
+
+    <section id="matches" class="view" hidden>
+      <button type="button" class="secondary back-btn" data-back>← Back</button>
+      <h2>Matched for me</h2>
+      <p class="hint">These are suggestions. Browse all open tasks any time.</p>
+      <div id="matches-list" class="cards"></div>
+    </section>
+
+    <section id="mine" class="view" hidden>
+      <button type="button" class="secondary back-btn" data-back>← Back</button>
+      <h2>My tasks</h2>
+      <div id="mine-list" class="cards"></div>
+      <div id="task-detail" class="card" hidden></div>
+    </section>
+
+    <section id="post" class="view" hidden>
+      <button type="button" class="secondary back-btn" data-back>← Back</button>
+      <h2>Post a task</h2>
+      <form id="post-form">
+        <label>Title <input name="title" required minlength="3" maxlength="120" /></label>
+        <label>Description <textarea name="description" required minlength="10" maxlength="4000" rows="4"></textarea></label>
+        <label>Category <select name="category" class="category-select" required></select></label>
+        <label>Skills needed (comma separated) <input name="required_skills" maxlength="400" /></label>
+        <label>Tools needed (comma separated) <input name="tools_needed" maxlength="400" /></label>
+        <label>City <input name="city" required maxlength="80" /></label>
+        <label>State <input name="state" maxlength="40" /></label>
+        <label>ZIP <input name="zip" required inputmode="numeric" pattern="\d{5}" /></label>
+        <label>Exact address (shared only with the assigned helper) <input name="address_private" maxlength="200" /></label>
+        <label>When
+          <select name="schedule_type">
+            <option value="asap">ASAP</option>
+            <option value="today">Today</option>
+            <option value="tomorrow" selected>Tomorrow</option>
+            <option value="this_week">This week</option>
+            <option value="specific_date">Specific date and time</option>
+            <option value="flexible">Flexible</option>
+            <option value="recurring">Recurring</option>
+            <option value="appointment">Appointment</option>
+          </select>
+        </label>
+        <label>Date and time (if specific) <input name="scheduled_for" type="datetime-local" /></label>
+        <label>Schedule notes <input name="schedule_note" maxlength="300" /></label>
+        <label>How many helpers
+          <select name="helpers">
+            <option value="one">One</option>
+            <option value="two">Two</option>
+            <option value="three_plus">Three</option>
+            <option value="unsure">Not sure</option>
+          </select>
+        </label>
+        <label>Type
+          <select name="help_type">
+            <option value="paid">Paid</option>
+            <option value="volunteer">Volunteer</option>
+          </select>
+        </label>
+        <label>Price per helper (USD) <input name="price" type="number" min="0" step="0.01" value="25" /></label>
+        <label>Supplies
+          <select name="supplies_provided">
+            <option value="unsure">Not sure</option>
+            <option value="requester">I provide everything</option>
+            <option value="helper">Helper should bring items</option>
+            <option value="either">Either is fine</option>
+          </select>
+        </label>
+        <label>Supplies notes <input name="supplies_note" maxlength="500" /></label>
+        <p class="hint">Platform fee: 15% of paid amounts, taken from the helper's pay. No hidden fees. Payments are test-mode only in this build.</p>
+        <button type="submit">Post task</button>
+      </form>
+    </section>
+
+    <section id="profile" class="view" hidden>
+      <button type="button" class="secondary back-btn" data-back>← Back</button>
+      <h2>My profile</h2>
+      <form id="profile-form">
+        <label>Display name <input name="display_name" maxlength="80" /></label>
+        <fieldset>
+          <legend>Role</legend>
+          <label><input type="radio" name="role_mode" value="need_help" /> Need help</label>
+          <label><input type="radio" name="role_mode" value="can_help" /> Can help</label>
+          <label><input type="radio" name="role_mode" value="both" /> Both</label>
+        </fieldset>
+        <label>City <input name="city" maxlength="80" /></label>
+        <label>State <input name="state" maxlength="40" /></label>
+        <label>ZIP <input name="zip" inputmode="numeric" pattern="\d{5}" /></label>
+        <label>Skills (comma separated) <input name="skills" maxlength="2000" /></label>
+        <label>Tools and equipment you own (comma separated) <input name="tools" maxlength="2000" /></label>
+        <label>Availability <input name="availability" maxlength="300" /></label>
+        <label>About you <textarea name="bio" rows="3" maxlength="1000"></textarea></label>
+        <label><input type="checkbox" name="profile_public" /> Show my profile in the community directory</label>
+        <label>My language for messages <select name="language"></select></label>
+        <button type="submit">Save profile</button>
+      </form>
+      <p id="verify-status" class="hint"></p>
+      <button id="request-verify" type="button" hidden>Verify my identity with Stripe</button>
+      <div class="card">
+        <h3>Get paid</h3>
+        <p id="payout-status" class="hint"></p>
+        <button id="payout-setup" type="button">Set up payouts</button>
+      </div>
+    </section>
+
+    <section id="messages" class="view" hidden>
+      <button type="button" class="secondary back-btn" data-back>← Back</button>
+      <h2>Messages</h2>
+      <p class="hint">Messages stay in the app. Phone numbers and email addresses can't be sent. Each message shows in your language.</p>
+      <div id="conv-list" class="cards"></div>
+      <div id="conv-view" class="card" hidden>
+        <div class="actions">
+          <button type="button" class="secondary" id="conv-back">← Back to messages</button>
+          <button type="button" class="danger" id="conv-block">Block this member</button>
+        </div>
+        <h3 id="conv-title"></h3>
+        <div id="conv-messages" class="cards"></div>
+        <form id="msg-form">
+          <label>Message <textarea name="body" rows="3" maxlength="2000" required></textarea></label>
+          <button type="submit">Send</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="members" class="view" hidden>
+      <button type="button" class="secondary back-btn" data-back>← Back</button>
+      <h2>Community members</h2>
+      <p class="hint">People who chose to share their profile. Contact details are never shown here.</p>
+      <div id="members-list" class="cards"></div>
+      <div id="member-detail" class="card" hidden></div>
+    </section>
+
+    <section id="admin" class="view" hidden>
+      <button type="button" class="secondary back-btn" data-back>← Back</button>
+      <h2>Admin queue</h2>
+      <p class="hint">Safety reports, tasks that need a decision, and verification requests.</p>
+      <h3>Safety reports</h3>
+      <div id="admin-safety" class="cards"></div>
+      <h3>Paused and disputed tasks</h3>
+      <div id="admin-tasks" class="cards"></div>
+      <h3>Verification requests</h3>
+      <div id="admin-verify" class="cards"></div>
+      <h3>Verified members</h3>
+      <div id="admin-verified" class="cards"></div>
+      <h3>Not yet verified</h3>
+      <p class="hint">People who signed up but haven't been verified, including rejected accounts.</p>
+      <div id="admin-unverified" class="cards"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms of Use</a>
+  </footer>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
